@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ЛЭТИ — Мониторинг микроклимата</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css"/>
+<style>
+body{background:#f0f2f5;font-size:.9rem}
+#sidebar{width:230px;min-height:100vh;background:#1a2332;flex-shrink:0;position:relative}
+#sidebar .brand{padding:1.2rem 1rem;border-bottom:1px solid #2c3e55;color:#fff;font-weight:700;font-size:1rem}
+#sidebar .nav-link{color:#adb5bd;padding:.55rem 1rem;border-radius:6px;margin:.1rem .5rem;
+  display:flex;align-items:center;gap:.5rem;cursor:pointer;text-decoration:none}
+#sidebar .nav-link:hover,#sidebar .nav-link.active{background:#2c3e55;color:#fff}
+#sidebar .sidebar-footer{position:absolute;bottom:0;width:100%;padding:.5rem}
+#main{flex:1;overflow-y:auto;padding:1.5rem}
+.page{display:none}.page.active{display:block}
+.card{border:none;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.stat-card{border-top:3px solid}
+.stat-card.clr-red{border-color:#e74c3c}.stat-card.clr-blue{border-color:#3498db}
+.stat-card.clr-green{border-color:#2ecc71}.stat-card.clr-purple{border-color:#9b59b6}
+.bstat{display:inline-block;padding:.2em .55em;border-radius:.3rem;font-size:.8rem;font-weight:600}
+.bstat-Active{background:#d1fae5;color:#065f46}
+.bstat-Warning{background:#fef3c7;color:#92400e}
+.bstat-Error{background:#fee2e2;color:#991b1b}
+.bstat-Inactive{background:#f3f4f6;color:#6b7280}
+#loginPage{min-height:100vh;background:linear-gradient(135deg,#1a2332 0%,#2c3e55 100%)}
+.filter-row .form-control,.filter-row .form-select{font-size:.83rem}
+th{white-space:nowrap;user-select:none}
+th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
+.mpill{padding:.22rem .55rem;border-radius:20px;font-size:.78rem;font-weight:600;display:inline-block}
+.mpill.temperature{background:#fde8e8;color:#c0392b}
+.mpill.humidity{background:#e8f4fd;color:#2980b9}
+.mpill.co2{background:#e8fdf0;color:#27ae60}
+#toastBox{position:fixed;top:1rem;right:1rem;z-index:9999;min-width:280px}
+.chart-box{position:relative;height:270px;width:100%;}
+</style>
+</head>
+<body>
+
+<!-- ════════ LOGIN ════════ -->
+<div id="loginPage" class="d-flex align-items-center justify-content-center page active">
+  <div class="card p-4" style="width:360px">
+    <div class="text-center mb-4">
+      <i class="bi bi-thermometer-half text-primary" style="font-size:2.5rem"></i>
+      <h5 class="mt-2 mb-0">Мониторинг микроклимата</h5>
+      <small class="text-muted">СПбГЭТУ «ЛЭТИ»</small>
+    </div>
+    <div id="loginErr" class="alert alert-danger d-none"></div>
+    <div class="mb-3"><label class="form-label">Логин</label>
+      <input id="lu" class="form-control" placeholder="admin или viewer"/></div>
+    <div class="mb-3"><label class="form-label">Пароль</label>
+      <input id="lp" type="password" class="form-control" placeholder="пароль"/></div>
+    <button class="btn btn-primary w-100" onclick="doLogin()">
+      <i class="bi bi-box-arrow-in-right me-1"></i>Войти</button>
+    <div class="mt-3 text-center text-muted" style="font-size:.78rem">
+      admin / admin123 &nbsp;|&nbsp; viewer / viewer123
+    </div>
+  </div>
+</div>
+
+<!-- ════════ APP SHELL ════════ -->
+<div id="app" class="d-flex" style="display:none!important">
+  <div id="sidebar">
+    <div class="brand"><i class="bi bi-thermometer-half me-2"></i>ЛЭТИ Климат</div>
+    <div class="mt-2">
+      <a class="nav-link" onclick="nav('dashboard')"><i class="bi bi-speedometer2"></i>Дашборд</a>
+      <a class="nav-link" onclick="nav('buildings')"><i class="bi bi-building"></i>Корпуса</a>
+      <a class="nav-link" onclick="nav('rooms')"><i class="bi bi-door-open"></i>Помещения</a>
+      <a class="nav-link" onclick="nav('sensors')"><i class="bi bi-cpu"></i>Датчики</a>
+      <a class="nav-link" onclick="nav('search')"><i class="bi bi-search"></i>Поиск</a>
+      <a class="nav-link" onclick="nav('statistics')"><i class="bi bi-graph-up"></i>Статистика</a>
+      <a class="nav-link admin-only" onclick="nav('importexport')"><i class="bi bi-arrow-down-up"></i>Импорт/Экспорт</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="text-muted ps-2 mb-1" style="font-size:.75rem" id="sideUser"></div>
+      <a class="nav-link text-danger" onclick="doLogout()">
+        <i class="bi bi-box-arrow-right"></i>Выйти</a>
+    </div>
+  </div>
+
+  <div id="main">
+
+    <!-- DASHBOARD -->
+    <div id="pgDashboard" class="page">
+      <h4 class="mb-3"><i class="bi bi-speedometer2 me-2"></i>Дашборд</h4>
+      <div class="row g-3 mb-4" id="dashCards"></div>
+      <!-- Chart: current avg temperature per building -->
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Средняя температура по ВУЗу (за 24ч)</span>
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadDashboard()">
+            <i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+        <div class="card-body">
+          <div class="chart-box">
+            <canvas id="dashChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <!-- Table: all three metrics per building -->
+      <div class="card">
+        <div class="card-header">Среднее по корпусам (сейчас)</div>
+        <div class="card-body p-0">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th>Корпус</th><th>🌡 Температура</th><th>💧 Влажность</th><th>🌫 CO₂</th>
+            </tr></thead>
+            <tbody id="dashTBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- BUILDINGS -->
+    <div id="pgBuildings" class="page">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0"><i class="bi bi-building me-2"></i>Корпуса</h4>
+        <button class="btn btn-primary btn-sm admin-only" onclick="openBldgModal()">
+          <i class="bi bi-plus-lg me-1"></i>Добавить</button>
+      </div>
+      <div class="card mb-3"><div class="card-body py-2">
+        <div class="row g-2 filter-row">
+          <div class="col-md-4"><input class="form-control" id="fBN" placeholder="Название" oninput="filterBldg()"/></div>
+          <div class="col-md-4"><input class="form-control" id="fBA" placeholder="Адрес" oninput="filterBldg()"/></div>
+          <div class="col-md-3"><select class="form-select" id="fBS" onchange="filterBldg()">
+            <option value="">Любой статус</option><option>Active</option><option>Inactive</option>
+          </select></div>
+          <div class="col-md-1"><button class="btn btn-outline-secondary btn-sm w-100"
+            onclick="resetF('fBN','fBA','fBS');filterBldg()"><i class="bi bi-x-lg"></i></button></div>
+        </div>
+      </div></div>
+      <div class="card"><div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th class="sortable" onclick="sortBldg('name',this)">Название ↕</th>
+            <th class="sortable" onclick="sortBldg('address',this)">Адрес ↕</th>
+            <th class="sortable" onclick="sortBldg('floors_count',this)">Этажей ↕</th>
+            <th>Статус</th><th class="admin-only">Действия</th>
+          </tr></thead>
+          <tbody id="bldgTBody"></tbody>
+        </table>
+      </div></div>
+    </div>
+
+    <!-- FLOORS -->
+    <div id="pgFloors" class="page">
+      <nav aria-label="breadcrumb" class="mb-2"><ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="#" onclick="nav('buildings')">Корпуса</a></li>
+        <li class="breadcrumb-item active" id="floorsBc">Этажи</li>
+      </ol></nav>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0" id="floorsH">Этажи</h4>
+        <button class="btn btn-primary btn-sm admin-only" onclick="openFloorModal()">
+          <i class="bi bi-plus-lg me-1"></i>Добавить этаж</button>
+      </div>
+      <div class="card"><div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th>Этаж</th><th>Помещений</th><th>Статус</th><th class="admin-only">Действия</th>
+          </tr></thead>
+          <tbody id="floorsTBody"></tbody>
+        </table>
+      </div></div>
+    </div>
+
+    <!-- ROOMS LIST -->
+    <div id="pgRooms" class="page">
+      <nav class="mb-2" id="roomsNavWrap" style="display:none">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><a href="#" onclick="nav('buildings')">Корпуса</a></li>
+          <li class="breadcrumb-item" id="roomsBldgCr"></li>
+          <li class="breadcrumb-item active" id="roomsFloorCr"></li>
+        </ol>
+      </nav>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0" id="roomsH"><i class="bi bi-door-open me-2"></i>Помещения</h4>
+        <button class="btn btn-primary btn-sm admin-only" onclick="openRoomModal()">
+          <i class="bi bi-plus-lg me-1"></i>Добавить</button>
+      </div>
+      <div class="card mb-3"><div class="card-body py-2">
+        <div class="row g-2 filter-row">
+          <div class="col-md-2"><input class="form-control" id="fRN" placeholder="Номер" oninput="filterRooms()"/></div>
+          <div class="col-md-2"><input class="form-control" id="fRT" placeholder="Тип" oninput="filterRooms()"/></div>
+          <div class="col-md-3"><input class="form-control" id="fRB" placeholder="Корпус" oninput="filterRooms()"/></div>
+          <div class="col-md-2"><select class="form-select" id="fRS" onchange="filterRooms()">
+            <option value="">Любой статус</option><option>Active</option><option>Inactive</option>
+          </select></div>
+          <div class="col-md-1"><button class="btn btn-outline-secondary btn-sm w-100"
+            onclick="resetF('fRN','fRT','fRB','fRS');filterRooms()"><i class="bi bi-x-lg"></i></button></div>
+        </div>
+      </div></div>
+      <div class="card"><div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th>Номер</th><th>Тип</th><th>Площадь</th><th>Корпус / Этаж</th>
+            <th>🌡 °C</th><th>💧 %</th><th>🌫 ppm</th><th>Статус</th><th class="admin-only"></th>
+          </tr></thead>
+          <tbody id="roomsTBody"></tbody>
+        </table>
+      </div></div>
+    </div>
+
+    <!-- ROOM DETAIL -->
+    <div id="pgRoomDetail" class="page">
+      <nav class="mb-2"><ol class="breadcrumb mb-0" id="roomDetailBc"></ol></nav>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0" id="roomDetailH">Помещение</h4>
+        <div>
+          <button class="btn btn-outline-primary btn-sm admin-only me-1" onclick="editRoomDetail()">
+            <i class="bi bi-pencil me-1"></i>Ред.</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="nav('rooms')">
+            <i class="bi bi-arrow-left me-1"></i>Назад</button>
+        </div>
+      </div>
+      <div class="row g-3" id="roomDetailBody"></div>
+    </div>
+
+    <!-- SENSORS -->
+    <div id="pgSensors" class="page">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0"><i class="bi bi-cpu me-2"></i>Датчики</h4>
+        <button class="btn btn-primary btn-sm admin-only" onclick="openSensorModal()">
+          <i class="bi bi-plus-lg me-1"></i>Добавить</button>
+      </div>
+      <div class="card mb-3"><div class="card-body py-2">
+        <div class="row g-2 filter-row">
+          <div class="col-md-2"><input class="form-control" id="fSI" placeholder="ID датчика" oninput="filterSensors()"/></div>
+          <div class="col-md-2"><select class="form-select" id="fST" onchange="filterSensors()">
+            <option value="">Тип</option>
+            <option value="temperature">temperature</option>
+            <option value="humidity">humidity</option>
+            <option value="co2">co2</option>
+          </select></div>
+          <div class="col-md-2"><input class="form-control" id="fSM" placeholder="Модель" oninput="filterSensors()"/></div>
+          <div class="col-md-2"><input class="form-control" id="fSB" placeholder="Корпус" oninput="filterSensors()"/></div>
+          <div class="col-md-2"><select class="form-select" id="fSS" onchange="filterSensors()">
+            <option value="">Статус</option><option>Active</option><option>Warning</option><option>Error</option>
+          </select></div>
+          <div class="col-md-1"><button class="btn btn-outline-secondary btn-sm w-100"
+            onclick="resetF('fSI','fST','fSM','fSB','fSS');filterSensors()"><i class="bi bi-x-lg"></i></button></div>
+        </div>
+      </div></div>
+      <div class="card"><div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th>ID</th><th>Тип</th><th>Модель</th><th>Помещение</th><th>Корпус</th>
+            <th>Значение</th><th>Статус</th><th></th>
+          </tr></thead>
+          <tbody id="sensorsTBody"></tbody>
+        </table>
+      </div></div>
+    </div>
+
+    <!-- SENSOR HISTORY -->
+    <div id="pgSensorHistory" class="page">
+      <nav class="mb-2"><ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="#" onclick="nav('sensors')">Датчики</a></li>
+        <li class="breadcrumb-item active" id="histSenId">История</li>
+      </ol></nav>
+      <h4 class="mb-3">История статусов датчика</h4>
+      <div class="card mb-3"><div class="card-body py-2">
+        <label class="me-2">Период:</label>
+        <select class="form-select d-inline-block w-auto" id="histPeriod" onchange="loadSensorHistory()">
+          <option value="-7d">7 дней</option>
+          <option value="-30d" selected>30 дней</option>
+          <option value="-90d">90 дней</option>
+        </select>
+      </div></div>
+      <div class="card"><div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr>
+            <th>Дата/время</th><th>Было</th><th>Стало</th><th>Причина</th>
+          </tr></thead>
+          <tbody id="histTBody"></tbody>
+        </table>
+      </div></div>
+    </div>
+
+    <!-- SEARCH -->
+    <div id="pgSearch" class="page">
+      <h4 class="mb-3"><i class="bi bi-search me-2"></i>Расширенный поиск</h4>
+      <div class="card mb-3"><div class="card-body">
+        <div class="row g-3 filter-row">
+          <div class="col-md-3"><label class="form-label">Корпус</label>
+            <input class="form-control" id="srB" placeholder="Любой"/></div>
+          <div class="col-md-2"><label class="form-label">Этаж (номер)</label>
+            <input class="form-control" type="number" id="srF" placeholder="Любой"/></div>
+          <div class="col-md-3"><label class="form-label">Тип помещения</label>
+            <input class="form-control" id="srT" placeholder="Аудитория…"/></div>
+          <div class="col-md-2"><label class="form-label">Номер</label>
+            <input class="form-control" id="srN" placeholder="101…"/></div>
+          <div class="col-md-2"><label class="form-label">Статус</label>
+            <select class="form-select" id="srS">
+              <option value="">Любой</option><option>Active</option><option>Inactive</option>
+            </select></div>
+          <div class="col-md-2"><label class="form-label">Темп. мин °C</label>
+            <input class="form-control" type="number" id="srTn" placeholder="0"/></div>
+          <div class="col-md-2"><label class="form-label">Темп. макс °C</label>
+            <input class="form-control" type="number" id="srTx" placeholder="40"/></div>
+          <div class="col-md-2"><label class="form-label">Влажность мин %</label>
+            <input class="form-control" type="number" id="srHn" placeholder="0"/></div>
+          <div class="col-md-2"><label class="form-label">Влажность макс %</label>
+            <input class="form-control" type="number" id="srHx" placeholder="100"/></div>
+          <div class="col-md-2"><label class="form-label">CO₂ мин ppm</label>
+            <input class="form-control" type="number" id="srCn" placeholder="0"/></div>
+          <div class="col-md-2"><label class="form-label">CO₂ макс ppm</label>
+            <input class="form-control" type="number" id="srCx" placeholder="5000"/></div>
+          <div class="col-12">
+            <button class="btn btn-primary" onclick="doSearch()">
+              <i class="bi bi-search me-1"></i>Найти</button>
+            <button class="btn btn-outline-secondary ms-2" onclick="resetSearch()">
+              <i class="bi bi-x-lg me-1"></i>Сброс</button>
+          </div>
+        </div>
+      </div></div>
+      <div class="card"><div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th>Помещение</th><th>Тип</th><th>Корпус</th><th>Этаж</th>
+            <th>🌡 °C</th><th>💧 %</th><th>🌫 ppm</th><th>Статус</th><th></th>
+          </tr></thead>
+          <tbody id="searchTBody">
+            <tr><td colspan="9" class="text-center text-muted py-3">
+              Задайте параметры и нажмите «Найти»</td></tr>
+          </tbody>
+        </table>
+      </div></div>
+    </div>
+
+    <!-- STATISTICS -->
+    <div id="pgStatistics" class="page">
+      <h4 class="mb-3"><i class="bi bi-graph-up me-2"></i>Статистика</h4>
+      <div class="card mb-3"><div class="card-body">
+        <div class="row g-3 align-items-end filter-row">
+          <div class="col-md-2"><label class="form-label">Метрика</label>
+            <select class="form-select" id="stMetric">
+              <option value="temperature">Температура</option>
+              <option value="humidity">Влажность</option>
+              <option value="co2">CO₂</option>
+            </select></div>
+          <div class="col-md-2"><label class="form-label">Период</label>
+            <select class="form-select" id="stPeriod">
+              <option value="-6h">6 часов</option>
+              <option value="-24h" selected>24 часа</option>
+              <option value="-7d">7 дней</option>
+              <option value="-30d">30 дней</option>
+            </select></div>
+          <div class="col-md-2"><label class="form-label">Интервал</label>
+            <select class="form-select" id="stWin">
+              <option value="15m">15 мин</option>
+              <option value="1h" selected>1 час</option>
+              <option value="6h">6 часов</option>
+              <option value="1d">1 день</option>
+            </select></div>
+          <div class="col-md-3"><label class="form-label">Корпус</label>
+            <select class="form-select" id="stBldg">
+              <option value="">Все корпуса</option>
+            </select></div>
+          <div class="col-auto">
+            <button class="btn btn-primary" onclick="loadStatistics()">
+              <i class="bi bi-play-fill me-1"></i>Построить</button>
+          </div>
+        </div>
+      </div></div>
+      <div class="card">
+        <div class="card-body">
+          <div id="stEmpty" class="text-center text-muted py-5" style="display:none">
+            <i class="bi bi-bar-chart-line" style="font-size:2rem"></i>
+            <div class="mt-2">Нет данных за выбранный период</div>
+          </div>
+          <div id="stLoading" class="text-center text-muted py-5" style="display:none">
+            <div class="spinner-border text-primary" role="status"></div>
+            <div class="mt-2">Загрузка данных…</div>
+          </div>
+          <div class="chart-box" id="stChartWrap" style="display:none">
+            <canvas id="statsChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMPORT / EXPORT -->
+    <div id="pgImportexport" class="page">
+      <h4 class="mb-3"><i class="bi bi-arrow-down-up me-2"></i>Импорт / Экспорт</h4>
+      <div class="row g-4">
+        <div class="col-md-6">
+          <div class="card h-100"><div class="card-body text-center py-5">
+            <i class="bi bi-cloud-download text-primary" style="font-size:3rem"></i>
+            <h5 class="mt-3">Экспорт данных</h5>
+            <p class="text-muted">Выгрузить все данные системы в JSON одним нажатием</p>
+            <button class="btn btn-primary btn-lg" onclick="doExport()">
+              <i class="bi bi-download me-2"></i>Экспортировать всё</button>
+          </div></div>
+        </div>
+        <div class="col-md-6">
+          <div class="card h-100"><div class="card-body text-center py-5">
+            <i class="bi bi-cloud-upload text-success" style="font-size:3rem"></i>
+            <h5 class="mt-3">Импорт данных</h5>
+            <p class="text-muted">Загрузить данные из JSON-файла (ранее экспортированного)</p>
+            <input type="file" id="importFile" accept=".json" class="form-control mb-3"/>
+            <button class="btn btn-success btn-lg" onclick="doImport()">
+              <i class="bi bi-upload me-2"></i>Импортировать</button>
+          </div></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ════ MODALS ════ -->
+<div class="modal fade" id="mBldg" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header">
+    <h5 class="modal-title" id="mBldgTitle">Корпус</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+  </div>
+  <div class="modal-body">
+    <input type="hidden" id="mbId"/>
+    <div class="mb-3"><label class="form-label">Название *</label><input class="form-control" id="mbName"/></div>
+    <div class="mb-3"><label class="form-label">Адрес *</label><input class="form-control" id="mbAddr"/></div>
+    <div class="mb-3"><label class="form-label">Этажей *</label>
+      <input class="form-control" type="number" id="mbFloors" min="1"/></div>
+    <div class="mb-3"><label class="form-label">Статус</label>
+      <select class="form-select" id="mbStatus">
+        <option>Active</option><option>Inactive</option>
+      </select></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+    <button class="btn btn-primary" onclick="saveBldg()">Сохранить</button>
+  </div>
+</div></div></div>
+
+<div class="modal fade" id="mFloor" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Этаж</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input type="hidden" id="mfId"/>
+    <input type="hidden" id="mfBid"/>
+    <div class="mb-3"><label class="form-label">Номер этажа *</label>
+      <input class="form-control" type="number" id="mfNum" min="1"/></div>
+    <div class="mb-3"><label class="form-label">Статус</label>
+      <select class="form-select" id="mfSt"><option>Active</option><option>Inactive</option></select></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+    <button class="btn btn-primary" onclick="saveFloor()">Сохранить</button>
+  </div>
+</div></div></div>
+
+<div class="modal fade" id="mRoom" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header">
+    <h5 class="modal-title" id="mRoomTitle">Помещение</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+  </div>
+  <div class="modal-body">
+    <input type="hidden" id="mrId"/>
+    <div class="mb-3"><label class="form-label">Корпус *</label>
+      <select class="form-select" id="mrBldg" onchange="fillFloors4Room()"></select></div>
+    <div class="mb-3"><label class="form-label">Этаж *</label>
+      <select class="form-select" id="mrFloor"></select></div>
+    <div class="row g-2 mb-2">
+      <div class="col-6"><label class="form-label">Номер *</label>
+        <input class="form-control" id="mrNum"/></div>
+      <div class="col-6"><label class="form-label">Площадь м²</label>
+        <input class="form-control" type="number" id="mrArea" step="0.1"/></div>
+    </div>
+    <div class="mb-3"><label class="form-label">Тип</label>
+      <select class="form-select" id="mrType">
+        <option>Аудитория</option><option>Лаборатория</option><option>Кабинет</option>
+        <option>Деканат</option><option>Библиотека</option>
+        <option>Серверная</option><option>Столовая</option><option>Спортзал</option>
+      </select></div>
+    <div class="mb-3"><label class="form-label">Статус</label>
+      <select class="form-select" id="mrSt"><option>Active</option><option>Inactive</option></select></div>
+    <div class="mb-3"><label class="form-label">Комментарий</label>
+      <textarea class="form-control" id="mrCmt" rows="2"></textarea></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+    <button class="btn btn-primary" onclick="saveRoom()">Сохранить</button>
+  </div>
+</div></div></div>
+
+<div class="modal fade" id="mSensor" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header">
+    <h5 class="modal-title" id="mSenTitle">Датчик</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+  </div>
+  <div class="modal-body">
+    <input type="hidden" id="msId"/>
+    <div class="mb-3"><label class="form-label">Корпус *</label>
+      <select class="form-select" id="msBldg" onchange="fillFloors4Sen()"></select></div>
+    <div class="mb-3"><label class="form-label">Этаж *</label>
+      <select class="form-select" id="msFloor" onchange="fillRooms4Sen()"></select></div>
+    <div class="mb-3"><label class="form-label">Помещение *</label>
+      <select class="form-select" id="msRoom"></select></div>
+    <div class="mb-3"><label class="form-label">Тип метрики *</label>
+      <select class="form-select" id="msMetric">
+        <option value="temperature">temperature</option>
+        <option value="humidity">humidity</option>
+        <option value="co2">co2</option>
+      </select></div>
+    <div class="mb-3"><label class="form-label">Модель</label>
+      <input class="form-control" id="msModel"/></div>
+    <div class="mb-3"><label class="form-label">Статус</label>
+      <select class="form-select" id="msSt">
+        <option>Active</option><option>Warning</option><option>Error</option><option>Inactive</option>
+      </select></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+    <button class="btn btn-primary" onclick="saveSensor()">Сохранить</button>
+  </div>
+</div></div></div>
+
+<div id="toastBox"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/chart.js@4.4.3/dist/chart.umd.js"></script>
+<script>
+'use strict';
+
+// Статус авторизации и данные текущего пользователя
+
+let JWT   = localStorage.getItem('jwt');
+let ME    = JSON.parse(localStorage.getItem('me') || 'null');
+let bldgAll = [], bldgFlt = [];
+let roomsAll = [], sensorsAll = [];
+let ctxBldg = null, ctxFloor = null, ctxSensor = null, ctxRoom = null;
+let sDir = {};
+
+// Глобальные и единственные экземпляры графиков
+let chartDash = null;
+let chartStats = null;
+
+const COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
+                '#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4'];
+
+
+// Утилиты и общие функции
+
+const g  = id => document.getElementById(id);
+const fv = (v,u) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(1)+u : '—';
+const nul = id => { const v=g(id)?.value||''; return v===''?null:parseFloat(v); };
+const qj = obj => JSON.stringify(obj).replace(/"/g,'&quot;');
+const resetF = (...ids) => ids.forEach(id => {
+  const e=g(id); if(!e)return;
+  if(e.tagName==='SELECT') e.selectedIndex=0; else e.value='';
+});
+
+const avgS = (arr, u) => {
+  if (!arr) return '—';
+  const valid = arr.map(x => parseFloat(x)).filter(x => !isNaN(x));
+  if (!valid.length) return '—';
+  return (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(1) + u;
+};
+
+// Универсальный и надежный парсер даты в формат "ДД.ММ ЧЧ:ММ"
+function formatTime(ts) {
+  if (!ts) return '';
+  try {
+    const p = ts.split(/[-T :.Z]/);
+    if (p.length >= 5) return `${p[2]}.${p[1]} ${p[3]}:${p[4]}`;
+  } catch(e) {}
+  return String(ts).substring(0, 16).replace('T', ' '); 
+}
+
+function toast(msg, type='info') {
+  const d = document.createElement('div');
+  d.className = `alert alert-${type} alert-dismissible fade show py-2 px-3 mb-2`;
+  d.style.boxShadow = '0 2px 8px rgba(0,0,0,.15)';
+  d.innerHTML = msg + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+  g('toastBox').appendChild(d);
+  setTimeout(() => { try { d.remove(); } catch(_){} }, 4500);
+}
+
+
+// API
+
+async function api(method, path, body) {
+  const h = {'Content-Type':'application/json'};
+  if (JWT) h['Authorization'] = 'Bearer ' + JWT;
+  const r = await fetch('/api' + path, {
+    method, headers: h,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (r.status === 401) { doLogout(); return null; }
+  if (!r.ok) { toast('Ошибка: ' + await r.text(), 'danger'); return null; }
+  if (r.status === 204) return null;
+  return r.json();
+}
+async function apiRaw(path) {
+  const r = await fetch('/api' + path, {headers:{'Authorization':'Bearer '+JWT}});
+  if (!r.ok) throw new Error(await r.text());
+  return r;
+}
+
+
+// Авторизация и управление сессией
+
+async function doLogin() {
+  const u = g('lu').value.trim(), p = g('lp').value;
+  const d = await api('POST', '/auth/login', {username: u, password: p});
+  if (!d) { showErr('Неверный логин или пароль'); return; }
+  JWT = d.token; ME = d.user;
+  localStorage.setItem('jwt', JWT);
+  localStorage.setItem('me', JSON.stringify(ME));
+  enterApp();
+}
+function doLogout() {
+  JWT = null; ME = null;
+  localStorage.removeItem('jwt'); localStorage.removeItem('me');
+  g('app').style.display = 'none';
+  g('loginPage').style.cssText = 'display:flex';
+  g('loginPage').classList.add('active');
+}
+function enterApp() {
+  g('loginPage').style.display = 'none';
+  g('loginPage').classList.remove('active');
+  g('app').style.removeProperty('display');
+  g('sideUser').textContent = (ME?.name||'') + ' (' + ME?.role + ')';
+  applyRole();
+  nav('dashboard');
+}
+function showErr(msg) {
+  const e = g('loginErr'); e.textContent = msg; e.classList.remove('d-none');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  if (JWT && ME) enterApp();
+  else { g('loginPage').style.cssText='display:flex'; g('loginPage').classList.add('active'); }
+  g('lp').onkeyup = e => { if (e.key === 'Enter') doLogin(); };
+});
+function applyRole() {
+  const isAdmin = ME?.role === 'admin';
+  document.querySelectorAll('.admin-only').forEach(x => x.style.display = isAdmin ? '' : 'none');
+}
+
+
+// Навигация и отображение страниц
+
+function showPage(pid) {
+  document.querySelectorAll('#main .page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('#sidebar .nav-link').forEach(l => l.classList.remove('active'));
+  const pg = g(pid); if (pg) pg.classList.add('active');
+  applyRole();
+}
+function nav(page) {
+  showPage('pg' + page[0].toUpperCase() + page.slice(1));
+  const link = document.querySelector(`#sidebar .nav-link[onclick*="'${page}'"]`);
+  if (link) link.classList.add('active');
+  switch (page) {
+    case 'dashboard':   loadDashboard();    break;
+    case 'buildings':   loadBuildings();    break;
+    case 'rooms':
+      ctxFloor = null; ctxBldg = null;
+      g('roomsNavWrap').style.display = 'none';
+      g('roomsH').innerHTML = '<i class="bi bi-door-open me-2"></i>Помещения';
+      loadRooms();
+      break;
+    case 'sensors':     loadSensors();      break;
+    case 'statistics':  initStats();        break;
+    default: break;
+  }
+}
+function goFloors(b) {
+  ctxBldg = b; showPage('pgFloors');
+  g('floorsBc').textContent = b.name;
+  g('floorsH').textContent  = 'Этажи — ' + b.name;
+  loadFloors(b.id); applyRole();
+}
+function goRoomsOfFloor(floor, bldg) {
+  ctxFloor = floor; ctxBldg = bldg;
+  showPage('pgRooms');
+  g('roomsNavWrap').style.display = '';
+  g('roomsBldgCr').innerHTML = `<a href="#" onclick="goFloors(${qj(bldg)})">${bldg.name}</a>`;
+  g('roomsFloorCr').textContent = 'Этаж ' + floor.floor_number;
+  g('roomsH').textContent = 'Помещения — Этаж ' + floor.floor_number;
+  loadRooms(null, floor.id); applyRole();
+}
+function goRoomDetail(room) {
+  ctxRoom = room; showPage('pgRoomDetail'); loadRoomDetail(room.id); applyRole();
+}
+function goSensorHistory(sid) {
+  ctxSensor = sid; showPage('pgSensorHistory');
+  g('histSenId').textContent = sid; loadSensorHistory(); applyRole();
+}
+
+
+// Дашборд
+
+async function loadDashboard() {
+  // Убиваем старый график немедленно 
+  if (chartDash) {
+    chartDash.destroy();
+    chartDash = null;
+  }
+
+  const [buildings, rooms, sensors, allReadings, chartData] = await Promise.all([
+    api('GET', '/buildings'),
+    api('GET', '/rooms'),
+    api('GET', '/sensors'),
+    api('GET', '/readings/latest'),
+    api('GET', '/readings/range?start=-24h&metric_type=temperature&win=2h')
+  ]);
+
+  const blds = buildings || [];
+
+  // средние по корпусу для карточек
+  const temps = (allReadings||[]).filter(r=>r.metric_type==='temperature').map(r=>r.value);
+  const hums  = (allReadings||[]).filter(r=>r.metric_type==='humidity').map(r=>r.value);
+  const co2s  = (allReadings||[]).filter(r=>r.metric_type==='co2').map(r=>r.value);
+  g('dashCards').innerHTML =
+    sc('bi-building',    'Корпусов',        blds.length,       'clr-purple') +
+    sc('bi-door-open',   'Помещений',       (rooms||[]).length,'clr-blue')   +
+    sc('bi-cpu',         'Датчиков',        (sensors||[]).length,'clr-green')+
+    sc('bi-thermometer', 'Ср. температура', avgS(temps,'°C'),  'clr-red')    +
+    sc('bi-droplet',     'Ср. влажность',   avgS(hums,'%'),    'clr-blue')   +
+    sc('bi-wind',        'Ср. CO₂',         avgS(co2s,' ppm'), 'clr-green');
+
+  // средние по корпусу для таблицы (по последним показаниям)
+  const bldgSums = {}, bldgCnts = {};
+  (allReadings||[]).forEach(r => {
+    const bid = r.building_id; if (!bid) return;
+    const mt  = r.metric_type; 
+    const v = parseFloat(r.value);
+    if (isNaN(v)) return;
+
+    if (!bldgSums[bid]) { bldgSums[bid] = {}; bldgCnts[bid] = {}; }
+    bldgSums[bid][mt] = (bldgSums[bid][mt] || 0) + v;
+    bldgCnts[bid][mt] = (bldgCnts[bid][mt] || 0) + 1;
+  });
+  const s = {};
+  Object.keys(bldgSums).forEach(bid => {
+    s[bid] = {};
+    Object.keys(bldgSums[bid]).forEach(mt => {
+      s[bid][mt] = Math.round((bldgSums[bid][mt] / bldgCnts[bid][mt]) * 10) / 10;
+    });
+  });
+
+  // итоговая отрисовка таблицы
+  g('dashTBody').innerHTML = blds.map(b => {
+    const bs = s[b.id] || {};
+    return `<tr>
+      <td>${b.name}</td>
+      <td>${bs.temperature != null ? bs.temperature + ' °C' : '—'}</td>
+      <td>${bs.humidity    != null ? bs.humidity    + ' %'  : '—'}</td>
+      <td>${bs.co2         != null ? bs.co2         + ' ppm': '—'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">Нет данных</td></tr>';
+
+  // график — средняя температура по корпусу за последние 24 часа (по данным всех датчиков, усредненным в 2-часовые интервалы)
+  let labels = [];
+  let values = [];
+
+  if (chartData && chartData.length > 0) {
+    const tMap = {};
+    chartData.forEach(d => {
+       const v = parseFloat(d.value);
+       if(!isNaN(v)) {
+          if(!tMap[d.time]) tMap[d.time] = {sum:0, cnt:0};
+          tMap[d.time].sum += v;
+          tMap[d.time].cnt += 1;
+       }
+    });
+    const times = Object.keys(tMap).sort();
+    labels = times.map(t => formatTime(t));
+    values = times.map(t => +(tMap[t].sum / tMap[t].cnt).toFixed(1));
+  } else {
+    // Безопасный фоллбек, если нет данных за период
+    labels = ['Нет данных'];
+    values = [0];
+  }
+
+  // Рисуем график сразу
+  const ctx = document.getElementById('dashChart');
+  if (ctx) {
+    chartDash = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Ср. температура по ВУЗу (°C)',
+          data: values,
+          borderColor: '#e74c3c',
+          backgroundColor: 'rgba(231,76,60,.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true, position: 'top' } },
+        scales: { x: { ticks: { maxTicksLimit: 15 } } }
+      }
+    });
+  }
+}
+
+function sc(icon, label, val, cls) {
+  return `<div class="col-md-2 col-sm-4">
+    <div class="card stat-card ${cls} p-3">
+      <div class="text-muted" style="font-size:.74rem">
+        <i class="bi ${icon} me-1"></i>${label}</div>
+      <div style="font-size:1.4rem;font-weight:700">${val}</div>
+    </div></div>`;
+}
+
+
+// Корпуса
+
+async function loadBuildings() {
+  bldgAll = await api('GET', '/buildings') || [];
+  bldgFlt = [...bldgAll];
+  renderBldg(bldgFlt);
+}
+function filterBldg() {
+  const n = g('fBN').value.toLowerCase();
+  const a = g('fBA').value.toLowerCase();
+  const s = g('fBS').value;
+  bldgFlt = bldgAll.filter(b =>
+    b.name.toLowerCase().includes(n) &&
+    b.address.toLowerCase().includes(a) &&
+    (!s || b.status === s)
+  );
+  renderBldg(bldgFlt);
+}
+function sortBldg(field, th) {
+  sDir[field] = !sDir[field];
+  bldgFlt.sort((a,b) => {
+    if (a[field] == null) return 1; if (b[field] == null) return -1;
+    return (a[field] > b[field] ? 1 : -1) * (sDir[field] ? 1 : -1);
+  });
+  document.querySelectorAll('#pgBuildings th').forEach(t =>
+    t.textContent = t.textContent.replace(/[↑↓]\s*/g,'').trimEnd());
+  th.textContent += sDir[field] ? ' ↑' : ' ↓';
+  renderBldg(bldgFlt);
+}
+function renderBldg(data) {
+  g('bldgTBody').innerHTML = data.map(b => `<tr style="cursor:pointer"
+    onclick="goFloors(${qj(b)})">
+    <td>${b.name}</td><td>${b.address}</td><td>${b.floors_count}</td>
+    <td><span class="bstat bstat-${b.status}">${b.status}</span></td>
+    <td class="admin-only" onclick="event.stopPropagation()">
+      <button class="btn btn-sm btn-outline-primary me-1"
+        onclick="openBldgModal(${qj(b)})"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger"
+        onclick="delBldg('${b.id}')"><i class="bi bi-trash"></i></button>
+    </td>
+  </tr>`).join('') ||
+    '<tr><td colspan="5" class="text-center text-muted py-3">Нет данных</td></tr>';
+  applyRole();
+}
+function openBldgModal(b) {
+  g('mbId').value = b?.id || '';
+  g('mbName').value = b?.name || '';
+  g('mbAddr').value = b?.address || '';
+  g('mbFloors').value = b?.floors_count || 1;
+  g('mbStatus').value = b?.status || 'Active';
+  g('mBldgTitle').textContent = b ? 'Редактировать корпус' : 'Добавить корпус';
+  new bootstrap.Modal(g('mBldg')).show();
+}
+async function saveBldg() {
+  const id = g('mbId').value;
+  const body = {name:g('mbName').value, address:g('mbAddr').value,
+    floors_count:+g('mbFloors').value, status:g('mbStatus').value};
+  const r = id ? await api('PUT','/buildings/'+id,body)
+               : await api('POST','/buildings',body);
+  if (!r) return;
+  bootstrap.Modal.getInstance(g('mBldg'))?.hide();
+  toast(id ? 'Корпус обновлён' : 'Корпус добавлен', 'success');
+  loadBuildings();
+}
+async function delBldg(id) {
+  if (!confirm('Удалить корпус?')) return;
+  await api('DELETE', '/buildings/' + id);
+  toast('Корпус удалён','success'); loadBuildings();
+}
+
+
+// Этажи
+
+async function loadFloors(bid) {
+  const [floors, allRooms] = await Promise.all([
+    api('GET', '/buildings/' + bid + '/floors'),
+    api('GET', '/rooms?building_id=' + bid),
+  ]);
+  g('floorsTBody').innerHTML = (floors||[]).map(f => {
+    const rc = (allRooms||[]).filter(r=>r.floor_id===f.id).length;
+    return `<tr style="cursor:pointer"
+      onclick="goRoomsOfFloor(${qj(f)},${qj(ctxBldg)})">
+      <td>Этаж ${f.floor_number}</td><td>${rc}</td>
+      <td><span class="bstat bstat-${f.status}">${f.status}</span></td>
+      <td class="admin-only" onclick="event.stopPropagation()">
+        <button class="btn btn-sm btn-outline-primary me-1"
+          onclick="openFloorModal(${qj(f)})"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-danger"
+          onclick="delFloor('${f.id}')"><i class="bi bi-trash"></i></button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">Нет этажей</td></tr>';
+  applyRole();
+}
+function openFloorModal(f) {
+  g('mfId').value = f?.id || '';
+  g('mfBid').value = ctxBldg?.id || '';
+  g('mfNum').value = f?.floor_number || 1;
+  g('mfSt').value  = f?.status || 'Active';
+  new bootstrap.Modal(g('mFloor')).show();
+}
+async function saveFloor() {
+  const id = g('mfId').value, bid = g('mfBid').value;
+  const body = {building_id:bid, floor_number:+g('mfNum').value, status:g('mfSt').value};
+  const r = id ? await api('PUT','/floors/'+id,body) : await api('POST','/floors',body);
+  if (!r) return;
+  bootstrap.Modal.getInstance(g('mFloor'))?.hide();
+  toast('Сохранено','success'); loadFloors(bid);
+}
+async function delFloor(id) {
+  if (!confirm('Удалить этаж?')) return;
+  await api('DELETE', '/floors/' + id);
+  toast('Удалён','success'); loadFloors(ctxBldg.id);
+}
+
+
+// Комнаты
+
+async function loadRooms(bid, fid) {
+  let url = '/rooms';
+  const p = []; if (bid) p.push('building_id='+bid); if (fid) p.push('floor_id='+fid);
+  if (p.length) url += '?' + p.join('&');
+
+  const [rooms, blds, reads] = await Promise.all([
+    api('GET', url),
+    api('GET', '/buildings'),
+    api('GET', '/readings/latest'),
+  ]);
+  roomsAll = rooms || [];
+
+  const bMap = Object.fromEntries((blds||[]).map(b=>[b.id,b.name]));
+  const rMap = {};
+  (reads||[]).forEach(r => { rMap[r.room_id+'_'+r.metric_type] = r.value; });
+
+  roomsAll.forEach(r => {
+    r._bn  = bMap[r.building_id] || r.building_id;
+    r._fn  = parseInt(r.floor_id?.split('-').pop() || 0);
+    r._tmp = rMap[r.id+'_temperature'];
+    r._hum = rMap[r.id+'_humidity'];
+    r._co2 = rMap[r.id+'_co2'];
+  });
+  filterRooms();
+}
+function filterRooms() {
+  const fn = g('fRN').value.toLowerCase(), ft = g('fRT').value.toLowerCase(),
+        fb = g('fRB').value.toLowerCase(), fs = g('fRS').value;
+  const f = roomsAll.filter(r =>
+    (!fn || r.room_number.toLowerCase().includes(fn)) &&
+    (!ft || r.type.toLowerCase().includes(ft)) &&
+    (!fb || r._bn.toLowerCase().includes(fb)) &&
+    (!fs || r.status === fs)
+  );
+  g('roomsTBody').innerHTML = f.map(r => `<tr>
+    <td><a href="#" onclick="goRoomDetail(${qj(r)})">${r.room_number}</a></td>
+    <td>${r.type}</td><td>${r.area} м²</td>
+    <td>${r._bn} / Эт.${r._fn}</td>
+    <td>${fv(r._tmp,'°C')}</td><td>${fv(r._hum,'%')}</td><td>${fv(r._co2,' ppm')}</td>
+    <td><span class="bstat bstat-${r.status}">${r.status}</span></td>
+    <td class="admin-only">
+      <button class="btn btn-sm btn-outline-primary me-1"
+        onclick="openRoomModal(${qj(r)})"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger"
+        onclick="delRoom('${r.id}')"><i class="bi bi-trash"></i></button>
+    </td>
+  </tr>`).join('') || '<tr><td colspan="9" class="text-center text-muted py-3">Нет данных</td></tr>';
+  applyRole();
+}
+async function loadRoomDetail(rid) {
+  const [room, blds, sensors] = await Promise.all([
+    api('GET', '/rooms/'+rid),
+    api('GET', '/buildings'),
+    api('GET', '/sensors?room_id='+rid),
+  ]);
+  if (!room) return;
+  ctxRoom = room;
+  const bn = (blds||[]).find(b=>b.id===room.building_id)?.name || room.building_id;
+  g('roomDetailH').textContent = 'Помещение ' + room.room_number;
+  g('roomDetailBc').innerHTML = `
+    <li class="breadcrumb-item"><a href="#" onclick="nav('rooms')">Помещения</a></li>
+    <li class="breadcrumb-item active">${room.room_number}</li>`;
+  g('roomDetailBody').innerHTML = `
+    <div class="col-md-4">
+      <div class="card mb-3"><div class="card-body">
+        <h6 class="mb-3">Информация</h6>
+        <table class="table table-sm table-borderless mb-0">
+          <tr><td class="text-muted">Номер</td><td><b>${room.room_number}</b></td></tr>
+          <tr><td class="text-muted">Тип</td><td>${room.type}</td></tr>
+          <tr><td class="text-muted">Площадь</td><td>${room.area} м²</td></tr>
+          <tr><td class="text-muted">Корпус</td><td>${bn}</td></tr>
+          <tr><td class="text-muted">Статус</td>
+            <td><span class="bstat bstat-${room.status}">${room.status}</span></td></tr>
+          <tr><td class="text-muted">Комментарий</td><td>${room.comment||'—'}</td></tr>
+        </table>
+      </div></div>
+    </div>
+    <div class="col-md-4">
+      <div class="card mb-3"><div class="card-body">
+        <h6 class="mb-3">Показатели (сейчас)</h6>
+        ${mp('temperature','🌡 Температура', room.metrics?.temperature, '°C')}
+        ${mp('humidity',   '💧 Влажность',   room.metrics?.humidity,   '%')}
+        ${mp('co2',        '🌫 CO₂',         room.metrics?.co2,        ' ppm')}
+      </div></div>
+    </div>
+    <div class="col-md-4">
+      <div class="card"><div class="card-body">
+        <h6 class="mb-3">Датчики (${(sensors||[]).length})</h6>
+        ${(sensors||[]).map(s=>`
+          <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+            <div>
+              <span class="mpill ${s.metric_type}">${s.metric_type}</span>
+              <small class="text-muted ms-2">${s.model}</small>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <b>${s.last_value!=null?s.last_value:'—'}</b>
+              <span class="bstat bstat-${s.status}">${s.status}</span>
+              <button class="btn btn-sm btn-outline-secondary"
+                onclick="goSensorHistory('${s.id}')">
+                <i class="bi bi-clock-history"></i></button>
+            </div>
+          </div>`).join('')}
+      </div></div>
+    </div>`;
+  applyRole();
+}
+function mp(type, label, metric, unit) {
+  const val  = metric?.value != null ? metric.value + unit : '—';
+  const time = metric?.time  ? formatTime(metric.time) : '';
+  return `<div class="mb-3">
+    <div class="d-flex justify-content-between">
+      <span class="text-muted">${label}</span>
+      <span class="mpill ${type}" style="font-size:.93rem">${val}</span>
+    </div>
+    <div style="font-size:.72rem;color:#aaa">${time}</div>
+  </div>`;
+}
+function editRoomDetail() { if (ctxRoom) openRoomModal(ctxRoom); }
+async function openRoomModal(r) {
+  g('mrId').value = r?.id || '';
+  const blds = await api('GET','/buildings') || [];
+  g('mrBldg').innerHTML = blds.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  if (r) g('mrBldg').value = r.building_id;
+  await fillFloors4Room();
+  if (r) {
+    g('mrFloor').value = r.floor_id;
+    g('mrNum').value   = r.room_number;
+    g('mrArea').value  = r.area;
+    g('mrType').value  = r.type;
+    g('mrSt').value    = r.status;
+    g('mrCmt').value   = r.comment || '';
+  }
+  g('mRoomTitle').textContent = r ? 'Редактировать помещение' : 'Добавить помещение';
+  new bootstrap.Modal(g('mRoom')).show();
+}
+async function fillFloors4Room() {
+  const bid = g('mrBldg').value;
+  const floors = await api('GET','/buildings/'+bid+'/floors') || [];
+  g('mrFloor').innerHTML = floors.map(f=>`<option value="${f.id}">Этаж ${f.floor_number}</option>`).join('');
+}
+async function saveRoom() {
+  const id = g('mrId').value, fid = g('mrFloor').value, bid = g('mrBldg').value;
+  const body = {floor_id:fid, building_id:bid, room_number:g('mrNum').value,
+    type:g('mrType').value, area:+g('mrArea').value,
+    comment:g('mrCmt').value, status:g('mrSt').value};
+  const r = id ? await api('PUT','/rooms/'+id,body) : await api('POST','/rooms',body);
+  if (!r) return;
+  bootstrap.Modal.getInstance(g('mRoom'))?.hide();
+  toast('Помещение сохранено','success');
+  loadRooms(ctxBldg?.id, ctxFloor?.id);
+}
+async function delRoom(id) {
+  if (!confirm('Удалить помещение?')) return;
+  await api('DELETE','/rooms/'+id);
+  toast('Удалено','success'); loadRooms(ctxBldg?.id, ctxFloor?.id);
+}
+
+// Сенсоры
+
+async function loadSensors() {
+  const [sensors, blds, reads] = await Promise.all([
+    api('GET','/sensors'),
+    api('GET','/buildings'),
+    api('GET','/readings/latest'),
+  ]);
+  sensorsAll = sensors || [];
+  const bMap = Object.fromEntries((blds||[]).map(b=>[b.id,b.name]));
+  const lv = {};
+  (reads||[]).forEach(r=>{ lv[r.sensor_id+'_'+r.metric_type]=r.value; });
+  sensorsAll.forEach(s=>{
+    s._bn = bMap[s.building_id] || s.building_id;
+    s.last_value = lv[s.id+'_'+s.metric_type];
+  });
+  filterSensors();
+}
+function filterSensors() {
+  const fi=g('fSI').value.toLowerCase(), ft=g('fST').value,
+        fm=g('fSM').value.toLowerCase(), fb=g('fSB').value.toLowerCase(),
+        fs=g('fSS').value;
+  const f = sensorsAll.filter(s=>
+    (!fi||s.id.toLowerCase().includes(fi)) &&
+    (!ft||s.metric_type===ft) &&
+    (!fm||s.model.toLowerCase().includes(fm)) &&
+    (!fb||s._bn.toLowerCase().includes(fb)) &&
+    (!fs||s.status===fs)
+  );
+  g('sensorsTBody').innerHTML = f.map(s=>`<tr>
+    <td><small class="text-muted">${s.id}</small></td>
+    <td><span class="mpill ${s.metric_type}">${s.metric_type}</span></td>
+    <td>${s.model}</td>
+    <td><small>${s.room_id}</small></td>
+    <td>${s._bn}</td>
+    <td><b>${s.last_value!=null?s.last_value:'—'}</b></td>
+    <td><span class="bstat bstat-${s.status}">${s.status}</span></td>
+    <td>
+      <button class="btn btn-sm btn-outline-secondary me-1"
+        onclick="goSensorHistory('${s.id}')"><i class="bi bi-clock-history"></i></button>
+      <button class="btn btn-sm btn-outline-primary admin-only me-1"
+        onclick="openSensorModal(${qj(s)})"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger admin-only"
+        onclick="delSensor('${s.id}')"><i class="bi bi-trash"></i></button>
+    </td>
+  </tr>`).join('') || '<tr><td colspan="8" class="text-center text-muted py-3">Нет данных</td></tr>';
+  applyRole();
+}
+async function openSensorModal(s) {
+  g('msId').value = s?.id || '';
+  const blds = await api('GET','/buildings') || [];
+  g('msBldg').innerHTML = blds.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  if (s) g('msBldg').value = s.building_id;
+  await fillFloors4Sen();
+  if (s) {
+    g('msFloor').value  = s.floor_id;
+    await fillRooms4Sen();
+    g('msRoom').value   = s.room_id;
+    g('msMetric').value = s.metric_type;
+    g('msModel').value  = s.model;
+    g('msSt').value     = s.status;
+  }
+  g('mSenTitle').textContent = s ? 'Редактировать датчик' : 'Добавить датчик';
+  new bootstrap.Modal(g('mSensor')).show();
+}
+async function fillFloors4Sen() {
+  const bid = g('msBldg').value;
+  const floors = await api('GET','/buildings/'+bid+'/floors') || [];
+  g('msFloor').innerHTML = floors.map(f=>`<option value="${f.id}">Этаж ${f.floor_number}</option>`).join('');
+  await fillRooms4Sen();
+}
+async function fillRooms4Sen() {
+  const fid = g('msFloor').value;
+  const rooms = await api('GET','/rooms?floor_id='+fid) || [];
+  g('msRoom').innerHTML = rooms.map(r=>`<option value="${r.id}">${r.room_number} — ${r.type}</option>`).join('');
+}
+async function saveSensor() {
+  const id=g('msId').value, rid=g('msRoom').value, fid=g('msFloor').value, bid=g('msBldg').value;
+  const body={room_id:rid,floor_id:fid,building_id:bid,
+    metric_type:g('msMetric').value, model:g('msModel').value, status:g('msSt').value};
+  const r = id ? await api('PUT','/sensors/'+id,body) : await api('POST','/sensors',body);
+  if (!r) return;
+  bootstrap.Modal.getInstance(g('mSensor'))?.hide();
+  toast('Датчик сохранён','success'); loadSensors();
+}
+async function delSensor(id) {
+  if (!confirm('Удалить датчик?')) return;
+  await api('DELETE','/sensors/'+id); toast('Удалён','success'); loadSensors();
+}
+
+// История показаний сенсора
+
+async function loadSensorHistory() {
+  const period = g('histPeriod').value;
+  const rows = await api('GET','/sensors/'+ctxSensor+'/history?start='+period) || [];
+  g('histTBody').innerHTML = rows.map(r=>`<tr>
+    <td>${r.time ? formatTime(r.time) : '—'}</td>
+    <td><span class="bstat bstat-${r.old_status}">${r.old_status}</span></td>
+    <td><span class="bstat bstat-${r.new_status}">${r.new_status}</span></td>
+    <td>${r.reason||'—'}</td>
+  </tr>`).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">Нет событий</td></tr>';
+}
+
+// Поиск
+
+async function doSearch() {
+  const [rooms, blds, reads] = await Promise.all([
+    api('GET','/rooms'),
+    api('GET','/buildings'),
+    api('GET','/readings/latest'),
+  ]);
+  const bMap = Object.fromEntries((blds||[]).map(b=>[b.id,b.name]));
+  const rMap = {};
+  (reads||[]).forEach(r=>{ rMap[r.room_id+'_'+r.metric_type]=r.value; });
+  const all = (rooms||[]).map(r=>({...r,
+    _bn:bMap[r.building_id]||r.building_id,
+    _fn:parseInt(r.floor_id?.split('-').pop()||0),
+    _tmp:rMap[r.id+'_temperature'],
+    _hum:rMap[r.id+'_humidity'],
+    _co2:rMap[r.id+'_co2'],
+  }));
+
+  const srB=g('srB').value.toLowerCase(), srF=g('srF').value,
+        srT=g('srT').value.toLowerCase(), srN=g('srN').value.toLowerCase(),
+        srS=g('srS').value,
+        tN=nul('srTn'),tX=nul('srTx'), hN=nul('srHn'),hX=nul('srHx'),
+        cN=nul('srCn'),cX=nul('srCx');
+
+  const f = all.filter(r=>
+    (!srB||r._bn.toLowerCase().includes(srB)) &&
+    (!srF||r._fn===+srF) &&
+    (!srT||r.type.toLowerCase().includes(srT)) &&
+    (!srN||r.room_number.toLowerCase().includes(srN)) &&
+    (!srS||r.status===srS) &&
+    (tN==null||r._tmp==null||r._tmp>=tN) && (tX==null||r._tmp==null||r._tmp<=tX) &&
+    (hN==null||r._hum==null||r._hum>=hN) && (hX==null||r._hum==null||r._hum<=hX) &&
+    (cN==null||r._co2==null||r._co2>=cN) && (cX==null||r._co2==null||r._co2<=cX)
+  );
+
+  g('searchTBody').innerHTML = f.map(r=>`<tr>
+    <td><a href="#" onclick="goRoomDetail(${qj(r)})">${r.room_number}</a></td>
+    <td>${r.type}</td><td>${r._bn}</td><td>${r._fn}</td>
+    <td>${fv(r._tmp,'°C')}</td><td>${fv(r._hum,'%')}</td><td>${fv(r._co2,' ppm')}</td>
+    <td><span class="bstat bstat-${r.status}">${r.status}</span></td>
+    <td><button class="btn btn-sm btn-outline-primary"
+      onclick="goRoomDetail(${qj(r)})"><i class="bi bi-eye"></i></button></td>
+  </tr>`).join('') || '<tr><td colspan="9" class="text-center text-muted py-3">Нет результатов</td></tr>';
+}
+function resetSearch() {
+  ['srB','srF','srT','srN','srS','srTn','srTx','srHn','srHx','srCn','srCx'].forEach(id=>{
+    const e=g(id); if(!e)return;
+    if(e.tagName==='SELECT') e.selectedIndex=0; else e.value='';
+  });
+  g('searchTBody').innerHTML =
+    '<tr><td colspan="9" class="text-center text-muted py-3">Задайте параметры и нажмите «Найти»</td></tr>';
+}
+
+// Статистика
+
+async function initStats() {
+  const blds = await api('GET','/buildings') || [];
+  const cur  = g('stBldg').value;
+  g('stBldg').innerHTML = '<option value="">Все корпуса</option>' +
+    blds.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  if (cur) g('stBldg').value = cur;
+  loadStatistics();
+}
+
+async function loadStatistics() {
+  // Убиваем график перед загрузкой данных
+  if (chartStats) {
+    chartStats.destroy();
+    chartStats = null;
+  }
+
+  const metric  = g('stMetric').value;
+  const period  = g('stPeriod').value;
+  const winSize = g('stWin').value; 
+  const bldgId  = g('stBldg').value;
+
+  let url = `/readings/range?start=${period}&metric_type=${metric}&win=${winSize}`;
+  if (bldgId) url += `&building_id=${bldgId}`;
+
+  // Подготовка интерфейса перед загрузкой данных
+  g('stEmpty').style.display   = 'none';
+  g('stLoading').style.display = 'block';
+  g('stChartWrap').style.display = 'none';
+
+  const data = await api('GET', url) || [];
+
+  g('stLoading').style.display = 'none';
+
+  if (!data.length) {
+    g('stEmpty').style.display = 'block';
+    return;
+  }
+
+  g('stChartWrap').style.display = 'block';
+
+  const byBldg = {};
+  data.forEach(p => {
+    const v = parseFloat(p.value);
+    if (!isNaN(v)) {
+      const key = p.building_id || 'unknown';
+      if (!byBldg[key]) byBldg[key] = {};
+      byBldg[key][p.time] = v;
+    }
+  });
+
+  const allLabels = [...new Set(data.map(p => p.time))].sort();
+  const labelsFmt = allLabels.map(t => formatTime(t));
+
+  const blds = await api('GET','/buildings') || [];
+  const bMap = Object.fromEntries(blds.map(b=>[b.id,b.name]));
+
+  const UNITS = {temperature:'°C', humidity:'%', co2:'ppm'};
+  const NAMES = {temperature:'Температура', humidity:'Влажность', co2:'CO₂'};
+
+  const datasets = Object.keys(byBldg).map((bid, i) => ({
+    label: bMap[bid] || bid,
+    data:  allLabels.map(t => byBldg[bid][t] ?? null),
+    borderColor:     COLORS[i % COLORS.length],
+    backgroundColor: COLORS[i % COLORS.length] + '22',
+    fill:  Object.keys(byBldg).length === 1,
+    tension: 0.3, pointRadius: 2, spanGaps: true,
+  }));
+
+  // Строим график
+  const ctx = document.getElementById('statsChart');
+  if (ctx) {
+    chartStats = new Chart(ctx, {
+      type: 'line',
+      data: { labels: labelsFmt, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels:{ boxWidth:12, font:{size:11} } },
+          title:  { display: true, text: NAMES[metric] + ' (' + UNITS[metric] + ')' },
+        },
+        scales: {
+          x: { ticks: { maxTicksLimit: 15, font:{size:10} } },
+          y: { title: { display:true, text: UNITS[metric] } },
+        },
+      },
+    });
+  }
+}
+
+// Импорт/экспорт данных
+
+async function doExport() {
+  try {
+    const r = await apiRaw('/export');
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'leti_climate_export.json';
+    a.click();
+    toast('Экспорт завершён','success');
+  } catch(e) { toast('Ошибка: '+e.message,'danger'); }
+}
+async function doImport() {
+  const file = g('importFile').files[0];
+  if (!file) { toast('Выберите файл','warning'); return; }
+  const fd = new FormData(); fd.append('file', file);
+  const r = await fetch('/api/import', {
+    method:'POST', headers:{'Authorization':'Bearer '+JWT}, body:fd });
+  if (!r.ok) { toast('Ошибка: '+await r.text(),'danger'); return; }
+  const d = await r.json();
+  toast('Импорт завершён: '+JSON.stringify(d.counts),'success');
+}
+</script>
+</body>
+</html>
