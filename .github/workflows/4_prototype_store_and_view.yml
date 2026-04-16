@@ -16,13 +16,13 @@ jobs:
           fetch-depth: 0
 
       - name: Check docker-compose.yml
-        run: .github/workflows/scripts/4_prototype_store_and_view.sh check-compose
+        run: .github/workflows/scripts/4_prototype_store_and_view.sh check-compose ./leti_climate_prototipe/docker-compose.yml
 
       - name: Build docker-compose
-        run: .github/workflows/scripts/4_prototype_store_and_view.sh build
+        run: docker compose -f ./leti_climate_prototipe/docker-compose.yml build --no-cache
 
       - name: Run docker-compose
-        run: .github/workflows/scripts/4_prototype_store_and_view.sh run
+        run: docker compose -f ./leti_climate_prototipe/docker-compose.yml up -d
 
       - name: check
         run: .github/workflows/scripts/4_prototype_store_and_view.sh check-tag
