@@ -27,13 +27,13 @@ jobs:
           override-error: DL3006, DL3000, DL3007, DL3008, DL3009, DL3013, DL3016, DL3018, DL3020, DL3028, DL3037, DL3047, DL4001, DL4003, DL4004
 
       - name: Check docker-compose.yml
-        run: .github/workflows/scripts/5_prototype_analysis.sh check-compose
+        run: .github/workflows/scripts/5_prototype_analysis.sh check-compose ./leti_climate_prototipe/docker-compose.yml
 
       - name: Build docker-compose
-        run: .github/workflows/scripts/5_prototype_analysis.sh build
+        run: docker compose -f ./leti_climate_prototipe/docker-compose.yml build --no-cache
 
       - name: Run docker-compose
-        run: .github/workflows/scripts/5_prototype_analysis.sh run
+        run: docker compose -f ./leti_climate_prototipe/docker-compose.yml up -d
 
       - name: Check containers are alive
         run: .github/workflows/scripts/5_prototype_analysis.sh check-containers
