@@ -18,11 +18,13 @@ check_docker_compose() {
 }
 
 build_docker_compose() {
-    docker compose build --no-cache
+    dc_file=${1:-"./docker-compose.yml"}
+    docker compose -f "${dc_file}" build --no-cache
 }
 
 run_docker_compose() {
-    docker compose up -d
+    dc_file=${1:-"./docker-compose.yml"}
+    docker compose -f "${dc_file}" up -d
 }
 
 check_tag() {
@@ -35,26 +37,27 @@ check_tag() {
     fi
 }
 
-ACTION=${1:-"all"}
+ACTION=${1}
+DC_PATH=${2:-"./docker-compose.yml"}
 
 case $ACTION in
     "check-compose")
-        check_docker_compose
+        check_docker_compose "${DC_PATH}"
         ;;
     "build")
-        build_docker_compose
+        build_docker_compose "${DC_PATH}"
         ;;
     "run")
-        run_docker_compose
+        run_docker_compose "${DC_PATH}"
         ;;
     "check-tag")
         check_tag
         ;;
-    # Для ручного запуска
+        #для ручного запуска
     "all")
-        check_docker_compose
-        build_docker_compose
-        run_docker_compose
+        check_docker_compose "${DC_PATH}"
+        build_docker_compose "${DC_PATH}"
+        run_docker_compose "${DC_PATH}"
         check_tag
         ;;
 esac
