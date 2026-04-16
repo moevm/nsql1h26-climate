@@ -154,13 +154,13 @@ case $ACTION in
         check_dockerfiles
         ;;
     "check-compose")
-        check_docker_compose
+        check_docker_compose "${DC_PATH}"
         ;;
     "build")
-        build_docker_compose
+        build_docker_compose "${DC_PATH}"
         ;;
     "run")
-        run_docker_compose
+        run_docker_compose "${DC_PATH}"
         ;;
     "check-containers")
         check_containers_alive
@@ -171,9 +171,9 @@ case $ACTION in
     # Для ручного запуска
     "all")
         check_dockerfiles
-        check_docker_compose
-        build_docker_compose
-        run_docker_compose
+        check_docker_compose "${DC_PATH}"
+        build_docker_compose "${DC_PATH}"
+        run_docker_compose "${DC_PATH}"
         check_containers_alive
         check_tag
         ;;
