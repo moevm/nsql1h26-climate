@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  db:
+    image: influxdb:2.7
+    volumes:
+      - influx_data:/var/lib/influxdb2
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: influxadmin
+      DOCKER_INFLUXDB_INIT_PASSWORD: influxpassword123
+      DOCKER_INFLUXDB_INIT_ORG: leti
+      DOCKER_INFLUXDB_INIT_BUCKET: climate
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: leti-super-secret-token-2026
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      INFLUX_URL: http://db:8086
+      INFLUX_TOKEN: leti-super-secret-token-2026
+      INFLUX_ORG: leti
+      INFLUX_BUCKET: climate
+      JWT_SECRET: leti-jwt-secret-key-2026
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  influx_data:
