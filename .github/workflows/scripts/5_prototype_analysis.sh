@@ -99,11 +99,13 @@ check_docker_compose() {
 }
 
 build_docker_compose() {
-    docker compose build --no-cache
+    dc_file=${1:-"./docker-compose.yml"}
+    docker compose -f "${dc_file}" build --no-cache
 }
 
 run_docker_compose() {
-    docker compose up -d
+    dc_file=${1:-"./docker-compose.yml"}
+    docker compose -f "${dc_file}" up -d
     sleep 30
 }
 
@@ -145,6 +147,7 @@ check_tag() {
 }
 
 ACTION=${1:-"all"}
+DC_PATH=${2:-"./docker-compose.yml"}
 
 case $ACTION in
     "check-dockerfiles")
