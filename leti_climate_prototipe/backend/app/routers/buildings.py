@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from app.influx import write_entity, query_entities, soft_delete
 from app.auth import get_current_user, require_admin
 
@@ -13,6 +14,13 @@ class BuildingIn(BaseModel):
     address: str
     floors_count: int
     status: str = "Active"
+
+    @field_validator("floors_count")
+    @classmethod
+    def floors_positive(cls, v):
+        if v < 1:
+            raise ValueError("Количество этажей должно быть не менее 1")
+        return v
 
 
 @router.get("")
@@ -40,7 +48,9 @@ def get_building(bid: str, _=Depends(get_current_user)):
 @router.post("")
 def create_building(body: BuildingIn, _=Depends(require_admin)):
     bid = "bldg-" + str(uuid.uuid4())[:6]
-    data = {**body.model_dump(), "id": bid, "deleted": False}
+    now = datetime.now(timezone.utc).isoformat()
+    data = {**body.model_dump(), "id": bid, "deleted": False,
+            "created_at": now, "updated_at": now}
     write_entity("buildings", "building_id", bid, data)
     return data
 
@@ -50,7 +60,10 @@ def update_building(bid: str, body: BuildingIn, _=Depends(require_admin)):
     rows = query_entities("buildings", "building_id", {"building_id": bid})
     if not rows:
         raise HTTPException(404, "Корпус не найден")
-    data = {**rows[0], **body.model_dump()}
+    now = datetime.now(timezone.utc).isoformat()
+    data = {**rows[0], **body.model_dump(), "updated_at": now}
+    if "created_at" not in data:
+        data["created_at"] = now
     write_entity("buildings", "building_id", bid, data)
     return data
 

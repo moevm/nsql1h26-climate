@@ -1,6 +1,6 @@
 import uuid
-from typing import Optional
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.influx import (
@@ -68,7 +68,9 @@ def get_sensor(sid: str, _=Depends(get_current_user)):
 @router.post("")
 def create_sensor(body: SensorIn, _=Depends(require_admin)):
     sid = "sen-" + str(uuid.uuid4())[:8]
-    data = {**body.model_dump(), "id": sid, "deleted": False}
+    now = datetime.now(timezone.utc).isoformat()
+    data = {**body.model_dump(), "id": sid, "deleted": False,
+            "created_at": now, "updated_at": now}
     write_entity("sensors", "sensor_id", sid, data,
                  extra_tags={k: getattr(body, k) for k in
                              ("room_id","floor_id","building_id","metric_type")})
@@ -85,7 +87,10 @@ def update_sensor(sid: str, body: SensorIn, _=Depends(require_admin)):
     if not rows:
         raise HTTPException(404, "Датчик не найден")
     old = rows[0]
-    data = {**old, **body.model_dump()}
+    now = datetime.now(timezone.utc).isoformat()
+    data = {**old, **body.model_dump(), "updated_at": now}
+    if "created_at" not in data:
+        data["created_at"] = now
     write_entity("sensors", "sensor_id", sid, data,
                  extra_tags={k: getattr(body, k) for k in
                              ("room_id","floor_id","building_id","metric_type")})

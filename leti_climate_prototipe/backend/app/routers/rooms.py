@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -53,7 +54,9 @@ def get_room(rid: str, _=Depends(get_current_user)):
 @router.post("")
 def create_room(body: RoomIn, _=Depends(require_admin)):
     rid = "room-" + str(uuid.uuid4())[:6]
-    data = {**body.model_dump(), "id": rid, "deleted": False}
+    now = datetime.now(timezone.utc).isoformat()
+    data = {**body.model_dump(), "id": rid, "deleted": False,
+            "created_at": now, "updated_at": now}
     write_entity("rooms", "room_id", rid, data,
                  extra_tags={"floor_id": body.floor_id, "building_id": body.building_id})
     return data
@@ -64,7 +67,10 @@ def update_room(rid: str, body: RoomIn, _=Depends(require_admin)):
     rows = query_entities("rooms", "room_id", {"room_id": rid})
     if not rows:
         raise HTTPException(404, "Помещение не найдено")
-    data = {**rows[0], **body.model_dump()}
+    now = datetime.now(timezone.utc).isoformat()
+    data = {**rows[0], **body.model_dump(), "updated_at": now}
+    if "created_at" not in data:
+        data["created_at"] = now
     write_entity("rooms", "room_id", rid, data,
                  extra_tags={"floor_id": body.floor_id, "building_id": body.building_id})
     return data

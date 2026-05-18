@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from app.influx import write_entity, query_entities, soft_delete
 from app.auth import get_current_user, require_admin
 
@@ -12,6 +13,13 @@ class FloorIn(BaseModel):
     building_id: str
     floor_number: int
     status: str = "Active"
+
+    @field_validator("floor_number")
+    @classmethod
+    def floor_positive(cls, v):
+        if v < 1:
+            raise ValueError("Номер этажа должен быть не менее 1")
+        return v
 
 
 @router.get("")
@@ -36,7 +44,9 @@ def get_floor(fid: str, _=Depends(get_current_user)):
 @router.post("")
 def create_floor(body: FloorIn, _=Depends(require_admin)):
     fid = "floor-" + str(uuid.uuid4())[:6]
-    data = {**body.model_dump(), "id": fid, "deleted": False}
+    now = datetime.now(timezone.utc).isoformat()
+    data = {**body.model_dump(), "id": fid, "deleted": False,
+            "created_at": now, "updated_at": now}
     write_entity("floors", "floor_id", fid, data,
                  extra_tags={"building_id": body.building_id})
     return data
@@ -47,7 +57,10 @@ def update_floor(fid: str, body: FloorIn, _=Depends(require_admin)):
     rows = query_entities("floors", "floor_id", {"floor_id": fid})
     if not rows:
         raise HTTPException(404, "Этаж не найден")
-    data = {**rows[0], **body.model_dump()}
+    now = datetime.now(timezone.utc).isoformat()
+    data = {**rows[0], **body.model_dump(), "updated_at": now}
+    if "created_at" not in data:
+        data["created_at"] = now
     write_entity("floors", "floor_id", fid, data,
                  extra_tags={"building_id": body.building_id})
     return data
