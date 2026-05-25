@@ -1,0 +1,52 @@
+services:
+  influxdb:
+    image: influxdb:2.7
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: password123
+      DOCKER_INFLUXDB_INIT_ORG: leti
+      DOCKER_INFLUXDB_INIT_BUCKET: climate
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: leti-benchmark-token-2026
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - influx_data:/var/lib/influxdb2
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: climate
+      POSTGRES_USER: leti
+      POSTGRES_PASSWORD: leti_pass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leti -d climate"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  scripts:
+    build: ./scripts
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: leti-benchmark-token-2026
+      INFLUX_ORG: leti
+      INFLUX_BUCKET: climate
+      PG_DSN: postgresql://leti:leti_pass@postgres:5432/climate
+      RESULTS_DIR: /results
+    volumes:
+      - ./results:/results
+
+volumes:
+  influx_data:
+  pg_data:

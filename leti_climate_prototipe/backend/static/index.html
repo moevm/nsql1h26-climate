@@ -8,14 +8,15 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css"/>
 <style>
-body{background:#f0f2f5;font-size:.9rem}
-#sidebar{width:230px;min-height:100vh;background:#1a2332;flex-shrink:0;position:relative}
+html,body{height:100%;margin:0;background:#f0f2f5;font-size:.9rem}
+#app{height:100vh;display:flex;overflow:hidden}
+#sidebar{width:230px;background:#1a2332;flex-shrink:0;height:100vh;overflow-y:auto}
 #sidebar .brand{padding:1.2rem 1rem;border-bottom:1px solid #2c3e55;color:#fff;font-weight:700;font-size:1rem}
 #sidebar .nav-link{color:#adb5bd;padding:.55rem 1rem;border-radius:6px;margin:.1rem .5rem;
   display:flex;align-items:center;gap:.5rem;cursor:pointer;text-decoration:none}
 #sidebar .nav-link:hover,#sidebar .nav-link.active{background:#2c3e55;color:#fff}
-#sidebar .sidebar-footer{position:absolute;bottom:0;width:100%;padding:.5rem}
-#main{flex:1;overflow-y:auto;padding:1.5rem}
+#sidebar .sidebar-footer{padding:.5rem;border-top:1px solid #2c3e55;margin-top:auto}
+#main{flex:1;padding:1.5rem;min-width:0;height:100vh;overflow-y:auto}
 .page{display:none}.page.active{display:block}
 .card{border:none;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .stat-card{border-top:3px solid}
@@ -35,10 +36,24 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
 .mpill.humidity{background:#e8f4fd;color:#2980b9}
 .mpill.co2{background:#e8fdf0;color:#27ae60}
 #toastBox{position:fixed;top:1rem;right:1rem;z-index:9999;min-width:280px}
-.chart-box{position:relative;height:270px;width:100%;}
+.chart-box{position:relative;height:270px;width:100%}
+.dt-small{font-size:.75rem;color:#999;white-space:nowrap}
 </style>
 </head>
 <body>
+
+<!-- ════ INIT OVERLAY ════ -->
+<div id="initOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(26,35,50,0.92);z-index:9998;align-items:center;justify-content:center;">
+  <div class="card p-4 text-center" style="min-width:340px;max-width:420px">
+    <div class="spinner-border text-primary mb-3" role="status" style="width:3rem;height:3rem">
+      <span class="visually-hidden">Загрузка...</span>
+    </div>
+    <h5 class="mb-2">Система инициализируется</h5>
+    <p class="text-muted mb-0">Выполняется первичная загрузка данных.<br>
+      Обычно занимает <b>15–30 секунд</b>. Пожалуйста, подождите.</p>
+  </div>
+</div>
 
 <!-- ════════ LOGIN ════════ -->
 <div id="loginPage" class="d-flex align-items-center justify-content-center page active">
@@ -63,9 +78,9 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
 
 <!-- ════════ APP SHELL ════════ -->
 <div id="app" class="d-flex" style="display:none!important">
-  <div id="sidebar">
+  <div id="sidebar" class="d-flex flex-column">
     <div class="brand"><i class="bi bi-thermometer-half me-2"></i>ЛЭТИ Климат</div>
-    <div class="mt-2">
+    <div class="mt-2 flex-grow-1">
       <a class="nav-link" onclick="nav('dashboard')"><i class="bi bi-speedometer2"></i>Дашборд</a>
       <a class="nav-link" onclick="nav('buildings')"><i class="bi bi-building"></i>Корпуса</a>
       <a class="nav-link" onclick="nav('rooms')"><i class="bi bi-door-open"></i>Помещения</a>
@@ -87,7 +102,6 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
     <div id="pgDashboard" class="page">
       <h4 class="mb-3"><i class="bi bi-speedometer2 me-2"></i>Дашборд</h4>
       <div class="row g-3 mb-4" id="dashCards"></div>
-      <!-- Chart: current avg temperature per building -->
       <div class="card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span>Средняя температура по ВУЗу (за 24ч)</span>
@@ -95,14 +109,24 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
             <i class="bi bi-arrow-clockwise"></i></button>
         </div>
         <div class="card-body">
-          <div class="chart-box">
-            <canvas id="dashChart"></canvas>
-          </div>
+          <div class="chart-box"><canvas id="dashChart"></canvas></div>
         </div>
       </div>
-      <!-- Table: all three metrics per building -->
       <div class="card">
         <div class="card-header">Среднее по корпусам (сейчас)</div>
+        <div class="card-body py-2 border-bottom">
+          <div class="row g-2 filter-row">
+            <div class="col-md-4"><input class="form-control" id="fDBN" placeholder="Название корпуса" oninput="filterDashTable()"/></div>
+            <div class="col-md-2"><input class="form-control" type="number" id="fDTn" placeholder="Темп мин °C" oninput="filterDashTable()"/></div>
+            <div class="col-md-2"><input class="form-control" type="number" id="fDTx" placeholder="Темп макс °C" oninput="filterDashTable()"/></div>
+            <div class="col-md-2"><input class="form-control" type="number" id="fDHn" placeholder="Влажн. мин %" oninput="filterDashTable()"/></div>
+            <div class="col-md-2"><input class="form-control" type="number" id="fDHx" placeholder="Влажн. макс %" oninput="filterDashTable()"/></div>
+            <div class="col-md-2"><input class="form-control" type="number" id="fDCn" placeholder="CO₂ мин ppm" oninput="filterDashTable()"/></div>
+            <div class="col-md-2"><input class="form-control" type="number" id="fDCx" placeholder="CO₂ макс ppm" oninput="filterDashTable()"/></div>
+            <div class="col-auto"><button class="btn btn-outline-secondary btn-sm"
+              onclick="resetF('fDBN','fDTn','fDTx','fDHn','fDHx','fDCn','fDCx');filterDashTable()"><i class="bi bi-x-lg"></i></button></div>
+          </div>
+        </div>
         <div class="card-body p-0">
           <table class="table table-sm table-hover mb-0">
             <thead class="table-light"><tr>
@@ -110,6 +134,10 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
             </tr></thead>
             <tbody id="dashTBody"></tbody>
           </table>
+        </div>
+        <div class="card-footer py-1 d-flex justify-content-between align-items-center">
+          <small id="dashCount" class="text-muted"></small>
+          <div id="dashPagination"></div>
         </div>
       </div>
     </div>
@@ -123,13 +151,19 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
       </div>
       <div class="card mb-3"><div class="card-body py-2">
         <div class="row g-2 filter-row">
-          <div class="col-md-4"><input class="form-control" id="fBN" placeholder="Название" oninput="filterBldg()"/></div>
-          <div class="col-md-4"><input class="form-control" id="fBA" placeholder="Адрес" oninput="filterBldg()"/></div>
-          <div class="col-md-3"><select class="form-select" id="fBS" onchange="filterBldg()">
+          <div class="col-md-3"><input class="form-control" id="fBN" placeholder="Название" oninput="filterBldg()"/></div>
+          <div class="col-md-3"><input class="form-control" id="fBA" placeholder="Адрес" oninput="filterBldg()"/></div>
+          <div class="col-md-2"><select class="form-select" id="fBS" onchange="filterBldg()">
             <option value="">Любой статус</option><option>Active</option><option>Inactive</option>
           </select></div>
-          <div class="col-md-1"><button class="btn btn-outline-secondary btn-sm w-100"
-            onclick="resetF('fBN','fBA','fBS');filterBldg()"><i class="bi bi-x-lg"></i></button></div>
+          <div class="col-md-1"><input class="form-control" id="fBF1" placeholder="Эт≥" type="number" min="1" oninput="filterBldg()"/></div>
+          <div class="col-md-1"><input class="form-control" id="fBF2" placeholder="Эт≤" type="number" min="1" oninput="filterBldg()"/></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fBCf" onchange="filterBldg()" title="Создан от"/></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fBCt" onchange="filterBldg()" title="Создан до"/></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fBUf" onchange="filterBldg()" title="Изменён от"/></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fBUt" onchange="filterBldg()" title="Изменён до"/></div>
+          <div class="col-auto"><button class="btn btn-outline-secondary btn-sm"
+            onclick="resetF('fBN','fBA','fBS','fBF1','fBF2','fBCf','fBCt','fBUf','fBUt');filterBldg()"><i class="bi bi-x-lg"></i></button></div>
         </div>
       </div></div>
       <div class="card"><div class="card-body p-0">
@@ -138,17 +172,75 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
             <th class="sortable" onclick="sortBldg('name',this)">Название ↕</th>
             <th class="sortable" onclick="sortBldg('address',this)">Адрес ↕</th>
             <th class="sortable" onclick="sortBldg('floors_count',this)">Этажей ↕</th>
-            <th>Статус</th><th class="admin-only">Действия</th>
+            <th>Статус</th><th>Создан</th><th>Изменён</th>
+            <th class="admin-only">Действия</th>
           </tr></thead>
           <tbody id="bldgTBody"></tbody>
         </table>
-      </div></div>
+      </div>
+        <div class="card-footer py-1 d-flex justify-content-between align-items-center">
+          <small id="bldgCount" class="text-muted"></small>
+          <div id="bldgPagination"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BUILDING DETAIL -->
+    <div id="pgBuildingDetail" class="page">
+      <nav class="mb-2"><ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="#" onclick="nav('buildings')">Корпуса</a></li>
+        <li class="breadcrumb-item active" id="bldgDetailBc">Корпус</li>
+      </ol></nav>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0" id="bldgDetailH">Корпус</h4>
+        <div>
+          <button class="btn btn-outline-primary btn-sm admin-only me-1" onclick="editBldgDetail()">
+            <i class="bi bi-pencil me-1"></i>Ред.</button>
+          <button class="btn btn-outline-primary btn-sm admin-only me-1" onclick="openFloorModal()">
+            <i class="bi bi-plus-lg me-1"></i>Добавить этаж</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="nav('buildings')">
+            <i class="bi bi-arrow-left me-1"></i>Назад</button>
+        </div>
+      </div>
+      <div class="row g-3 mb-3" id="bldgDetailInfo"></div>
+      <div class="card">
+        <div class="card-header">Этажи</div>
+        <div class="card-body py-2 border-bottom">
+          <div class="row g-2 filter-row">
+            <div class="col-md-2"><input class="form-control" id="fBDF1" placeholder="Этаж от" type="number" oninput="filterBldgDetailFloors()"/></div>
+            <div class="col-md-2"><input class="form-control" id="fBDF2" placeholder="Этаж до" type="number" oninput="filterBldgDetailFloors()"/></div>
+            <div class="col-md-2"><select class="form-select" id="fBDFS" onchange="filterBldgDetailFloors()">
+              <option value="">Любой статус</option><option>Active</option><option>Inactive</option>
+            </select></div>
+            <div class="col-md-2"><input class="form-control" type="date" id="fBDFCf" onchange="filterBldgDetailFloors()" title="Создан от"/></div>
+            <div class="col-md-2"><input class="form-control" type="date" id="fBDFCt" onchange="filterBldgDetailFloors()" title="Создан до"/></div>
+            <div class="col-md-2"><input class="form-control" type="date" id="fBDFUf" onchange="filterBldgDetailFloors()" title="Изменён от"/></div>
+            <div class="col-md-2"><input class="form-control" type="date" id="fBDFUt" onchange="filterBldgDetailFloors()" title="Изменён до"/></div>
+            <div class="col-auto"><button class="btn btn-outline-secondary btn-sm"
+              onclick="resetF('fBDF1','fBDF2','fBDFS','fBDFCf','fBDFCt','fBDFUf','fBDFUt');filterBldgDetailFloors()"><i class="bi bi-x-lg"></i></button></div>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <table class="table table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th>Этаж</th><th>Помещений</th><th>Статус</th>
+              <th>Создан</th><th>Изменён</th><th class="admin-only">Действия</th>
+            </tr></thead>
+            <tbody id="bldgDetailFloorsTBody"></tbody>
+          </table>
+        </div>
+        <div class="card-footer py-1 d-flex justify-content-between align-items-center">
+          <small id="bldgDetailFloorsCount" class="text-muted"></small>
+          <div id="bldgDetailFloorsPagination"></div>
+        </div>
+      </div>
     </div>
 
     <!-- FLOORS -->
     <div id="pgFloors" class="page">
       <nav aria-label="breadcrumb" class="mb-2"><ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="#" onclick="nav('buildings')">Корпуса</a></li>
+        <li class="breadcrumb-item" id="floorsBldgCr" style="display:none"></li>
         <li class="breadcrumb-item active" id="floorsBc">Этажи</li>
       </ol></nav>
       <div class="d-flex justify-content-between align-items-center mb-3">
@@ -156,14 +248,69 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
         <button class="btn btn-primary btn-sm admin-only" onclick="openFloorModal()">
           <i class="bi bi-plus-lg me-1"></i>Добавить этаж</button>
       </div>
+      <div class="card mb-3"><div class="card-body py-2">
+        <div class="row g-2 filter-row">
+          <div class="col-md-2"><input class="form-control" id="fFN1" placeholder="Этаж от" type="number" oninput="filterFloors()"/></div>
+          <div class="col-md-2"><input class="form-control" id="fFN2" placeholder="Этаж до" type="number" oninput="filterFloors()"/></div>
+          <div class="col-md-2"><select class="form-select" id="fFS" onchange="filterFloors()">
+            <option value="">Любой статус</option><option>Active</option><option>Inactive</option>
+          </select></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fFCf" onchange="filterFloors()" title="Создан от"/></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fFCt" onchange="filterFloors()" title="Создан до"/></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fFUf" onchange="filterFloors()" title="Изменён от"/></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fFUt" onchange="filterFloors()" title="Изменён до"/></div>
+          <div class="col-md-2"><input class="form-control" type="number" id="fFTn" placeholder="°C от" oninput="filterFloors()"/></div>
+          <div class="col-md-2"><input class="form-control" type="number" id="fFTx" placeholder="°C до" oninput="filterFloors()"/></div>
+          <div class="col-md-2"><input class="form-control" type="number" id="fFHn" placeholder="% от" oninput="filterFloors()"/></div>
+          <div class="col-md-2"><input class="form-control" type="number" id="fFHx" placeholder="% до" oninput="filterFloors()"/></div>
+          <div class="col-md-2"><input class="form-control" type="number" id="fFCOn" placeholder="CO₂ от" oninput="filterFloors()"/></div>
+          <div class="col-md-2"><input class="form-control" type="number" id="fFCOx" placeholder="CO₂ до" oninput="filterFloors()"/></div>
+          <div class="col-auto"><button class="btn btn-outline-secondary btn-sm"
+            onclick="resetF('fFN1','fFN2','fFS','fFCf','fFCt','fFUf','fFUt','fFTn','fFTx','fFHn','fFHx','fFCOn','fFCOx');filterFloors()"><i class="bi bi-x-lg"></i></button></div>
+        </div>
+      </div></div>
       <div class="card"><div class="card-body p-0">
         <table class="table table-hover mb-0">
           <thead class="table-light"><tr>
-            <th>Этаж</th><th>Помещений</th><th>Статус</th><th class="admin-only">Действия</th>
+            <th>Этаж</th><th>Помещений</th><th>Статус</th>
+            <th>Создан</th><th>Изменён</th><th class="admin-only">Действия</th>
           </tr></thead>
           <tbody id="floorsTBody"></tbody>
         </table>
-      </div></div>
+      </div>
+        <div class="card-footer py-1 d-flex justify-content-between align-items-center">
+          <small id="floorsCount" class="text-muted"></small>
+          <div id="floorsPagination"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLOOR DETAIL -->
+    <div id="pgFloorDetail" class="page">
+      <nav class="mb-2"><ol class="breadcrumb mb-0" id="floorDetailBc"></ol></nav>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0" id="floorDetailH">Этаж</h4>
+        <div>
+          <button class="btn btn-outline-primary btn-sm admin-only me-1" onclick="editFloorDetail()">
+            <i class="bi bi-pencil me-1"></i>Ред.</button>
+          <button class="btn btn-outline-secondary btn-sm" id="floorDetailBackBtn">
+            <i class="bi bi-arrow-left me-1"></i>Назад</button>
+        </div>
+      </div>
+      <div class="row g-3 mb-3" id="floorDetailInfo"></div>
+      <div class="card">
+        <div class="card-header">Помещения этажа</div>
+        <div class="card-body p-0">
+          <table class="table table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th>Номер</th><th>Тип</th><th>Площадь</th>
+              <th>🌡 °C</th><th>💧 %</th><th>🌫 ppm</th><th>Статус</th>
+              <th>Создан</th><th>Изменён</th>
+            </tr></thead>
+            <tbody id="floorDetailRoomsTBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- ROOMS LIST -->
@@ -184,23 +331,31 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
         <div class="row g-2 filter-row">
           <div class="col-md-2"><input class="form-control" id="fRN" placeholder="Номер" oninput="filterRooms()"/></div>
           <div class="col-md-2"><input class="form-control" id="fRT" placeholder="Тип" oninput="filterRooms()"/></div>
-          <div class="col-md-3"><input class="form-control" id="fRB" placeholder="Корпус" oninput="filterRooms()"/></div>
+          <div class="col-md-2"><input class="form-control" id="fRB" placeholder="Корпус" oninput="filterRooms()"/></div>
           <div class="col-md-2"><select class="form-select" id="fRS" onchange="filterRooms()">
             <option value="">Любой статус</option><option>Active</option><option>Inactive</option>
           </select></div>
-          <div class="col-md-1"><button class="btn btn-outline-secondary btn-sm w-100"
-            onclick="resetF('fRN','fRT','fRB','fRS');filterRooms()"><i class="bi bi-x-lg"></i></button></div>
+          <div class="col-md-1"><input class="form-control" id="fRA1" placeholder="Пл≥" type="number" oninput="filterRooms()"/></div>
+          <div class="col-md-1"><input class="form-control" id="fRA2" placeholder="Пл≤" type="number" oninput="filterRooms()"/></div>
+          <div class="col-auto"><button class="btn btn-outline-secondary btn-sm"
+            onclick="resetF('fRN','fRT','fRB','fRS','fRA1','fRA2');filterRooms()"><i class="bi bi-x-lg"></i></button></div>
         </div>
       </div></div>
       <div class="card"><div class="card-body p-0">
         <table class="table table-hover mb-0">
           <thead class="table-light"><tr>
             <th>Номер</th><th>Тип</th><th>Площадь</th><th>Корпус / Этаж</th>
-            <th>🌡 °C</th><th>💧 %</th><th>🌫 ppm</th><th>Статус</th><th class="admin-only"></th>
+            <th>🌡 °C</th><th>💧 %</th><th>🌫 ppm</th><th>Статус</th>
+            <th>Создан</th><th>Изменён</th><th class="admin-only"></th>
           </tr></thead>
           <tbody id="roomsTBody"></tbody>
         </table>
-      </div></div>
+      </div>
+        <div class="card-footer py-1 d-flex justify-content-between align-items-center">
+          <small id="roomsCount" class="text-muted"></small>
+          <div id="roomsPagination"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ROOM DETAIL -->
@@ -228,7 +383,7 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
       <div class="card mb-3"><div class="card-body py-2">
         <div class="row g-2 filter-row">
           <div class="col-md-2"><input class="form-control" id="fSI" placeholder="ID датчика" oninput="filterSensors()"/></div>
-          <div class="col-md-2"><select class="form-select" id="fST" onchange="filterSensors()">
+          <div class="col-md-1"><select class="form-select" id="fST" onchange="filterSensors()">
             <option value="">Тип</option>
             <option value="temperature">temperature</option>
             <option value="humidity">humidity</option>
@@ -236,22 +391,50 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
           </select></div>
           <div class="col-md-2"><input class="form-control" id="fSM" placeholder="Модель" oninput="filterSensors()"/></div>
           <div class="col-md-2"><input class="form-control" id="fSB" placeholder="Корпус" oninput="filterSensors()"/></div>
-          <div class="col-md-2"><select class="form-select" id="fSS" onchange="filterSensors()">
-            <option value="">Статус</option><option>Active</option><option>Warning</option><option>Error</option>
+          <div class="col-md-2"><input class="form-control" id="fSR" placeholder="Помещение" oninput="filterSensors()"/></div>
+          <div class="col-md-1"><select class="form-select" id="fSS" onchange="filterSensors()">
+            <option value="">Статус</option><option>Active</option><option>Warning</option>
+            <option>Error</option><option>Inactive</option>
           </select></div>
-          <div class="col-md-1"><button class="btn btn-outline-secondary btn-sm w-100"
-            onclick="resetF('fSI','fST','fSM','fSB','fSS');filterSensors()"><i class="bi bi-x-lg"></i></button></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fSCf" onchange="filterSensors()" title="Создан от"/></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fSCt" onchange="filterSensors()" title="Создан до"/></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fSUf" onchange="filterSensors()" title="Изменён от"/></div>
+          <div class="col-md-2"><input class="form-control" type="date" id="fSUt" onchange="filterSensors()" title="Изменён до"/></div>
+          <div class="col-auto"><button class="btn btn-outline-secondary btn-sm"
+            onclick="resetF('fSI','fST','fSM','fSB','fSR','fSS','fSCf','fSCt','fSUf','fSUt');filterSensors()"><i class="bi bi-x-lg"></i></button></div>
         </div>
       </div></div>
       <div class="card"><div class="card-body p-0">
         <table class="table table-hover mb-0">
           <thead class="table-light"><tr>
             <th>ID</th><th>Тип</th><th>Модель</th><th>Помещение</th><th>Корпус</th>
-            <th>Значение</th><th>Статус</th><th></th>
+            <th>Значение</th><th>Статус</th><th>Создан</th><th>Изменён</th><th></th>
           </tr></thead>
           <tbody id="sensorsTBody"></tbody>
         </table>
-      </div></div>
+      </div>
+        <div class="card-footer py-1 d-flex justify-content-between align-items-center">
+          <small id="sensorsCount" class="text-muted"></small>
+          <div id="sensorsPagination"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SENSOR DETAIL -->
+    <div id="pgSensorDetail" class="page">
+      <nav class="mb-2"><ol class="breadcrumb mb-0" id="senDetailBc"></ol></nav>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0" id="senDetailH">Датчик</h4>
+        <div>
+          <button class="btn btn-outline-primary btn-sm admin-only me-1" onclick="editSenDetail()">
+            <i class="bi bi-pencil me-1"></i>Ред.</button>
+          <button class="btn btn-outline-secondary btn-sm me-1" onclick="goSensorHistoryFromDetail()">
+            <i class="bi bi-clock-history me-1"></i>Вся история</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="nav('sensors')">
+            <i class="bi bi-arrow-left me-1"></i>Назад</button>
+        </div>
+      </div>
+      <div class="row g-3" id="senDetailBody"></div>
     </div>
 
     <!-- SENSOR HISTORY -->
@@ -262,12 +445,48 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
       </ol></nav>
       <h4 class="mb-3">История статусов датчика</h4>
       <div class="card mb-3"><div class="card-body py-2">
-        <label class="me-2">Период:</label>
-        <select class="form-select d-inline-block w-auto" id="histPeriod" onchange="loadSensorHistory()">
-          <option value="-7d">7 дней</option>
-          <option value="-30d" selected>30 дней</option>
-          <option value="-90d">90 дней</option>
-        </select>
+        <div class="row g-2 filter-row">
+          <div class="col-md-2">
+            <label class="form-label mb-1" style="font-size:.8rem">Период</label>
+            <select class="form-select" id="histPeriod" onchange="loadSensorHistory()">
+              <option value="-7d">7 дней</option>
+              <option value="-30d" selected>30 дней</option>
+              <option value="-90d">90 дней</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label mb-1" style="font-size:.8rem">Было (статус)</label>
+            <select class="form-select" id="histOldSt" onchange="filterHistory()">
+              <option value="">Любой</option><option>Active</option><option>Warning</option>
+              <option>Error</option><option>Inactive</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label mb-1" style="font-size:.8rem">Стало (статус)</label>
+            <select class="form-select" id="histNewSt" onchange="filterHistory()">
+              <option value="">Любой</option><option>Active</option><option>Warning</option>
+              <option>Error</option><option>Inactive</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label mb-1" style="font-size:.8rem">Причина</label>
+            <input class="form-control" id="histReason" placeholder="Поиск..." oninput="filterHistory()"/>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label mb-1" style="font-size:.8rem">Дата/время от</label>
+            <input class="form-control" type="datetime-local" id="histDateFrom" onchange="filterHistory()"/>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label mb-1" style="font-size:.8rem">Дата/время до</label>
+            <input class="form-control" type="datetime-local" id="histDateTo" onchange="filterHistory()"/>
+          </div>
+          <div class="col-auto d-flex align-items-end">
+            <button class="btn btn-outline-secondary btn-sm"
+              onclick="resetF('histOldSt','histNewSt','histReason','histDateFrom','histDateTo');filterHistory()">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
       </div></div>
       <div class="card"><div class="card-body p-0">
         <table class="table table-sm mb-0">
@@ -276,7 +495,9 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
           </tr></thead>
           <tbody id="histTBody"></tbody>
         </table>
-      </div></div>
+      </div>
+        <div class="card-footer py-1"><small id="histCount" class="text-muted"></small></div>
+      </div>
     </div>
 
     <!-- SEARCH -->
@@ -380,6 +601,72 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
           </div>
         </div>
       </div>
+
+      <!-- Distribution Analysis -->
+      <div class="card mt-3">
+        <div class="card-header"><i class="bi bi-bar-chart-fill me-2"></i>Анализ распределения</div>
+        <div class="card-body border-bottom">
+          <div class="row g-3 align-items-end filter-row">
+            <div class="col-md-2">
+              <label class="form-label">Сущность</label>
+              <select class="form-select" id="distEntity" onchange="updateDistOptions()">
+                <option value="sensors">Датчики</option>
+                <option value="rooms">Помещения</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Корпус</label>
+              <select class="form-select" id="distBldg"><option value="">Все</option></select>
+            </div>
+            <div class="col-md-2" id="distMetricWrap">
+              <label class="form-label">Метрика</label>
+              <select class="form-select" id="distMetric">
+                <option value="">Все</option>
+                <option value="temperature">temperature</option>
+                <option value="humidity">humidity</option>
+                <option value="co2">co2</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Статус</label>
+              <select class="form-select" id="distStatus">
+                <option value="">Все</option>
+                <option>Active</option><option>Warning</option>
+                <option>Error</option><option>Inactive</option>
+              </select>
+            </div>
+            <div class="col-md-2" id="distTypeWrap" style="display:none">
+              <label class="form-label">Тип помещения</label>
+              <input class="form-control" id="distRoomType" placeholder="Аудитория…"/>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Ось X</label>
+              <select class="form-select" id="distAxisX"></select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Группировать по</label>
+              <select class="form-select" id="distAxisY"></select>
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-primary" onclick="buildDistribution()">
+                <i class="bi bi-bar-chart-fill me-1"></i>Построить</button>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="distEmpty" class="text-center text-muted py-4" style="display:none">
+            <i class="bi bi-bar-chart" style="font-size:2rem"></i>
+            <div class="mt-2">Нет данных</div>
+          </div>
+          <div id="distLoading" class="text-center text-muted py-4" style="display:none">
+            <div class="spinner-border text-primary" role="status"></div>
+            <div class="mt-2">Загрузка…</div>
+          </div>
+          <div class="chart-box" id="distChartWrap" style="display:none">
+            <canvas id="distChart"></canvas>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- IMPORT / EXPORT -->
@@ -440,7 +727,7 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
   <div class="modal-body">
     <input type="hidden" id="mfId"/>
     <input type="hidden" id="mfBid"/>
-    <div class="mb-3"><label class="form-label">Номер этажа *</label>
+    <div class="mb-3"><label class="form-label">Номер этажа * (не менее 1)</label>
       <input class="form-control" type="number" id="mfNum" min="1"/></div>
     <div class="mb-3"><label class="form-label">Статус</label>
       <select class="form-select" id="mfSt"><option>Active</option><option>Inactive</option></select></div>
@@ -466,7 +753,7 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
       <div class="col-6"><label class="form-label">Номер *</label>
         <input class="form-control" id="mrNum"/></div>
       <div class="col-6"><label class="form-label">Площадь м²</label>
-        <input class="form-control" type="number" id="mrArea" step="0.1"/></div>
+        <input class="form-control" type="number" id="mrArea" step="0.1" min="0"/></div>
     </div>
     <div class="mb-3"><label class="form-label">Тип</label>
       <select class="form-select" id="mrType">
@@ -524,49 +811,95 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
 <script>
 'use strict';
 
-// Статус авторизации и данные текущего пользователя
+// ── State ──
+let JWT = localStorage.getItem('jwt');
+let ME  = JSON.parse(localStorage.getItem('me') || 'null');
 
-let JWT   = localStorage.getItem('jwt');
-let ME    = JSON.parse(localStorage.getItem('me') || 'null');
-let bldgAll = [], bldgFlt = [];
-let roomsAll = [], sensorsAll = [];
-let ctxBldg = null, ctxFloor = null, ctxSensor = null, ctxRoom = null;
+const PAGE_SIZE = 25;
+let bldgPage = 1, bldgTotal = 0;
+let floorsPage = 1, floorsTotal = 0;
+let bldgDetailPage = 1, bldgDetailTotal = 0;
+let roomsPage = 1, roomsTotal = 0;
+let sensorsPage = 1, sensorsTotal = 0;
+let _floorsRoomMap = {};
+let _roomsBlds = [], _roomsReads = [], _roomsCtxBid = null, _roomsCtxFid = null;
+let _sensorsBlds = [], _sensorsRooms = [], _sensorsReads = [];
+let bldgFlt = [];
+let bldgDetailAll = [], bldgDetailFlt = [];
+let sensorsAll = [];
+let historyAll = [];
+let dashBldgData = [];
+let ctxBldg = null, ctxFloor = null, ctxSensor = null, ctxRoom = null, ctxSensorObj = null;
 let sDir = {};
-
-// Глобальные и единственные экземпляры графиков
-let chartDash = null;
-let chartStats = null;
+let chartDash = null, chartStats = null, chartDist = null;
 
 const COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
                 '#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4'];
 
-
-// Утилиты и общие функции
-
 const g  = id => document.getElementById(id);
 const fv = (v,u) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(1)+u : '—';
-const nul = id => { const v=g(id)?.value||''; return v===''?null:parseFloat(v); };
+const nul = id => { const e=g(id); if(!e)return null; const v=e.value; return v===''?null:parseFloat(v); };
 const qj = obj => JSON.stringify(obj).replace(/"/g,'&quot;');
 const resetF = (...ids) => ids.forEach(id => {
   const e=g(id); if(!e)return;
   if(e.tagName==='SELECT') e.selectedIndex=0; else e.value='';
 });
 
+// Fetch all items ignoring pagination (for dropdowns, dashboard)
+async function apiAll(path) {
+  const sep = path.includes('?') ? '&' : '?';
+  const r = await api('GET', path + sep + 'page_size=9999&page=1');
+  if (!r) return [];
+  return Array.isArray(r) ? r : (r.items ?? []);
+}
+
+function renderCount(n) {
+  return `Найдено: <b>${n}</b>`;
+}
+
+function renderPagination(total, cur, size, fn) {
+  if (!size || size <= 0) return '';
+  const pages = Math.ceil(total / size) || 1;
+  if (pages <= 1) return '';
+  let out = '<ul class="pagination pagination-sm mb-0">';
+  out += `<li class="page-item${cur<=1?' disabled':''}"><a class="page-link" href="#" onclick="${fn}(${cur-1});return false">‹</a></li>`;
+  const s = Math.max(1, cur-2), e = Math.min(pages, s+4);
+  if (s > 1) out += `<li class="page-item"><a class="page-link" href="#" onclick="${fn}(1);return false">1</a></li>`;
+  if (s > 2) out += '<li class="page-item disabled"><span class="page-link">…</span></li>';
+  for (let i = s; i <= e; i++)
+    out += `<li class="page-item${i===cur?' active':''}"><a class="page-link" href="#" onclick="${fn}(${i});return false">${i}</a></li>`;
+  if (e < pages-1) out += '<li class="page-item disabled"><span class="page-link">…</span></li>';
+  if (e < pages) out += `<li class="page-item"><a class="page-link" href="#" onclick="${fn}(${pages});return false">${pages}</a></li>`;
+  out += `<li class="page-item${cur>=pages?' disabled':''}"><a class="page-link" href="#" onclick="${fn}(${cur+1});return false">›</a></li>`;
+  out += '</ul>';
+  return out;
+}
+
 const avgS = (arr, u) => {
   if (!arr) return '—';
   const valid = arr.map(x => parseFloat(x)).filter(x => !isNaN(x));
   if (!valid.length) return '—';
-  return (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(1) + u;
+  return (valid.reduce((a,b) => a+b, 0) / valid.length).toFixed(1) + u;
 };
 
-// Универсальный и надежный парсер даты в формат "ДД.ММ ЧЧ:ММ"
 function formatTime(ts) {
   if (!ts) return '';
   try {
-    const p = ts.split(/[-T :.Z]/);
-    if (p.length >= 5) return `${p[2]}.${p[1]} ${p[3]}:${p[4]}`;
+    const m = String(ts).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (m) return `${m[3]}.${m[2]} ${m[4]}:${m[5]}`;
   } catch(e) {}
-  return String(ts).substring(0, 16).replace('T', ' '); 
+  return String(ts).substring(0,16).replace('T',' ');
+}
+
+function formatDateTime(ts) {
+  if (!ts) return '—';
+  try {
+    const m = String(ts).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+    if (m) return `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}:${m[6]}`;
+    const m2 = String(ts).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (m2) return `${m2[3]}.${m2[2]}.${m2[1]} ${m2[4]}:${m2[5]}`;
+  } catch(e) {}
+  return '—';
 }
 
 function toast(msg, type='info') {
@@ -577,9 +910,6 @@ function toast(msg, type='info') {
   g('toastBox').appendChild(d);
   setTimeout(() => { try { d.remove(); } catch(_){} }, 4500);
 }
-
-
-// API
 
 async function api(method, path, body) {
   const h = {'Content-Type':'application/json'};
@@ -599,8 +929,7 @@ async function apiRaw(path) {
   return r;
 }
 
-
-// Авторизация и управление сессией
+// ── Авторизация ──
 
 async function doLogin() {
   const u = g('lu').value.trim(), p = g('lp').value;
@@ -614,33 +943,61 @@ async function doLogin() {
 function doLogout() {
   JWT = null; ME = null;
   localStorage.removeItem('jwt'); localStorage.removeItem('me');
-  g('app').style.display = 'none';
+  g('app').style.cssText = 'display:none!important';
   g('loginPage').style.cssText = 'display:flex';
   g('loginPage').classList.add('active');
 }
-function enterApp() {
-  g('loginPage').style.display = 'none';
+async function enterApp() {
+  g('loginPage').style.cssText = 'display:none!important';
   g('loginPage').classList.remove('active');
-  g('app').style.removeProperty('display');
+  g('app').style.cssText = '';
   g('sideUser').textContent = (ME?.name||'') + ' (' + ME?.role + ')';
   applyRole();
-  nav('dashboard');
+  await checkSeedReady();
+  const lastPage = localStorage.getItem('lastPage') || 'dashboard';
+  nav(lastPage);
 }
 function showErr(msg) {
   const e = g('loginErr'); e.textContent = msg; e.classList.remove('d-none');
 }
+
+async function checkSeedReady() {
+  const overlay = g('initOverlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  for (let i = 0; i < 20; i++) {
+    try {
+      const r = await fetch('/api/seed/status', {
+        headers: {'Authorization': 'Bearer ' + JWT}
+      });
+      if (r.status === 401) { overlay.style.display = 'none'; doLogout(); return; }
+      if (r.ok) {
+        const d = await r.json();
+        if (d.ready) { overlay.style.display = 'none'; return; }
+      }
+    } catch(e) {}
+    await new Promise(res => setTimeout(res, 2000));
+  }
+  overlay.style.display = 'none';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   if (JWT && ME) enterApp();
   else { g('loginPage').style.cssText='display:flex'; g('loginPage').classList.add('active'); }
   g('lp').onkeyup = e => { if (e.key === 'Enter') doLogin(); };
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.ctrlKey) {
+    const btns = document.querySelectorAll('.modal.show .btn-primary:not(:disabled)');
+    if (btns.length > 0) btns[btns.length - 1].click();
+  }
 });
 function applyRole() {
   const isAdmin = ME?.role === 'admin';
   document.querySelectorAll('.admin-only').forEach(x => x.style.display = isAdmin ? '' : 'none');
 }
 
-
-// Навигация и отображение страниц
+// ── Навигация ──
 
 function showPage(pid) {
   document.querySelectorAll('#main .page').forEach(p => p.classList.remove('active'));
@@ -649,6 +1006,7 @@ function showPage(pid) {
   applyRole();
 }
 function nav(page) {
+  localStorage.setItem('lastPage', page);
   showPage('pg' + page[0].toUpperCase() + page.slice(1));
   const link = document.querySelector(`#sidebar .nav-link[onclick*="'${page}'"]`);
   if (link) link.classList.add('active');
@@ -666,12 +1024,43 @@ function nav(page) {
     default: break;
   }
 }
+
+function goBldgDetail(b) {
+  ctxBldg = b;
+  showPage('pgBuildingDetail');
+  g('bldgDetailBc').textContent = b.name;
+  g('bldgDetailH').textContent  = b.name;
+  resetF('fBDF1','fBDF2','fBDFS','fBDFCf','fBDFCt','fBDFUf','fBDFUt');
+  loadBldgDetail(b.id);
+  applyRole();
+}
+
 function goFloors(b) {
-  ctxBldg = b; showPage('pgFloors');
+  ctxBldg = b;
+  showPage('pgFloors');
   g('floorsBc').textContent = b.name;
   g('floorsH').textContent  = 'Этажи — ' + b.name;
-  loadFloors(b.id); applyRole();
+  const cr = g('floorsBldgCr');
+  cr.innerHTML = `<a href="#" onclick="goBldgDetail(${qj(b)})">${b.name}</a>`;
+  cr.style.display = '';
+  resetF('fFN1','fFN2','fFS');
+  loadFloors(b.id);
+  applyRole();
 }
+
+function goFloorDetail(floor, bldg) {
+  ctxFloor = floor; ctxBldg = bldg;
+  showPage('pgFloorDetail');
+  g('floorDetailH').textContent = 'Этаж ' + floor.floor_number + ' — ' + bldg.name;
+  g('floorDetailBc').innerHTML = `
+    <li class="breadcrumb-item"><a href="#" onclick="nav('buildings')">Корпуса</a></li>
+    <li class="breadcrumb-item"><a href="#" onclick="goBldgDetail(${qj(bldg)})">${bldg.name}</a></li>
+    <li class="breadcrumb-item active">Этаж ${floor.floor_number}</li>`;
+  g('floorDetailBackBtn').onclick = () => goBldgDetail(bldg);
+  loadFloorDetail(floor, bldg);
+  applyRole();
+}
+
 function goRoomsOfFloor(floor, bldg) {
   ctxFloor = floor; ctxBldg = bldg;
   showPage('pgRooms');
@@ -681,125 +1070,134 @@ function goRoomsOfFloor(floor, bldg) {
   g('roomsH').textContent = 'Помещения — Этаж ' + floor.floor_number;
   loadRooms(null, floor.id); applyRole();
 }
+
 function goRoomDetail(room) {
   ctxRoom = room; showPage('pgRoomDetail'); loadRoomDetail(room.id); applyRole();
 }
+
 function goSensorHistory(sid) {
   ctxSensor = sid; showPage('pgSensorHistory');
-  g('histSenId').textContent = sid; loadSensorHistory(); applyRole();
+  g('histSenId').textContent = sid;
+  resetF('histOldSt','histNewSt','histReason','histDateFrom','histDateTo');
+  loadSensorHistory(); applyRole();
 }
 
+function goSensorHistoryFromDetail() {
+  if (ctxSensor) goSensorHistory(ctxSensor);
+}
 
-// Дашборд
+function goSenDetail(s) {
+  ctxSensor = s.id; ctxSensorObj = s;
+  showPage('pgSensorDetail');
+  g('senDetailH').textContent = 'Датчик ' + s.id;
+  g('senDetailBc').innerHTML = `
+    <li class="breadcrumb-item"><a href="#" onclick="nav('sensors')">Датчики</a></li>
+    <li class="breadcrumb-item active">${s.id}</li>`;
+  loadSenDetail(s);
+  applyRole();
+}
+
+// ── Дашборд ──
 
 async function loadDashboard() {
-  // Убиваем старый график немедленно 
-  if (chartDash) {
-    chartDash.destroy();
-    chartDash = null;
-  }
+  if (chartDash) { chartDash.destroy(); chartDash = null; }
 
   const [buildings, rooms, sensors, allReadings, chartData] = await Promise.all([
-    api('GET', '/buildings'),
-    api('GET', '/rooms'),
-    api('GET', '/sensors'),
+    apiAll('/buildings'),
+    apiAll('/rooms'),
+    apiAll('/sensors'),
     api('GET', '/readings/latest'),
     api('GET', '/readings/range?start=-24h&metric_type=temperature&win=2h')
   ]);
 
   const blds = buildings || [];
-
-  // средние по корпусу для карточек
   const temps = (allReadings||[]).filter(r=>r.metric_type==='temperature').map(r=>r.value);
   const hums  = (allReadings||[]).filter(r=>r.metric_type==='humidity').map(r=>r.value);
   const co2s  = (allReadings||[]).filter(r=>r.metric_type==='co2').map(r=>r.value);
+  const rm = rooms || []; const sn = sensors || [];
   g('dashCards').innerHTML =
-    sc('bi-building',    'Корпусов',        blds.length,       'clr-purple') +
-    sc('bi-door-open',   'Помещений',       (rooms||[]).length,'clr-blue')   +
-    sc('bi-cpu',         'Датчиков',        (sensors||[]).length,'clr-green')+
-    sc('bi-thermometer', 'Ср. температура', avgS(temps,'°C'),  'clr-red')    +
-    sc('bi-droplet',     'Ср. влажность',   avgS(hums,'%'),    'clr-blue')   +
-    sc('bi-wind',        'Ср. CO₂',         avgS(co2s,' ppm'), 'clr-green');
+    sc('bi-building',    'Корпусов',        blds.length,    'clr-purple') +
+    sc('bi-door-open',   'Помещений',       rm.length,      'clr-blue')   +
+    sc('bi-cpu',         'Датчиков',        sn.length,      'clr-green')  +
+    sc('bi-thermometer', 'Ср. температура', avgS(temps,'°C'),    'clr-red')    +
+    sc('bi-droplet',     'Ср. влажность',   avgS(hums,'%'),      'clr-blue')   +
+    sc('bi-wind',        'Ср. CO₂',         avgS(co2s,' ppm'),   'clr-green');
 
-  // средние по корпусу для таблицы (по последним показаниям)
   const bldgSums = {}, bldgCnts = {};
   (allReadings||[]).forEach(r => {
     const bid = r.building_id; if (!bid) return;
-    const mt  = r.metric_type; 
+    const mt  = r.metric_type;
     const v = parseFloat(r.value);
     if (isNaN(v)) return;
-
     if (!bldgSums[bid]) { bldgSums[bid] = {}; bldgCnts[bid] = {}; }
     bldgSums[bid][mt] = (bldgSums[bid][mt] || 0) + v;
     bldgCnts[bid][mt] = (bldgCnts[bid][mt] || 0) + 1;
   });
-  const s = {};
-  Object.keys(bldgSums).forEach(bid => {
-    s[bid] = {};
-    Object.keys(bldgSums[bid]).forEach(mt => {
-      s[bid][mt] = Math.round((bldgSums[bid][mt] / bldgCnts[bid][mt]) * 10) / 10;
-    });
+
+  dashBldgData = blds.map(b => {
+    const sums = bldgSums[b.id] || {};
+    const cnts = bldgCnts[b.id] || {};
+    const avg = mt => cnts[mt] ? Math.round(sums[mt]/cnts[mt]*10)/10 : null;
+    return { name: b.name, temperature: avg('temperature'), humidity: avg('humidity'), co2: avg('co2') };
   });
+  filterDashTable();
 
-  // итоговая отрисовка таблицы
-  g('dashTBody').innerHTML = blds.map(b => {
-    const bs = s[b.id] || {};
-    return `<tr>
-      <td>${b.name}</td>
-      <td>${bs.temperature != null ? bs.temperature + ' °C' : '—'}</td>
-      <td>${bs.humidity    != null ? bs.humidity    + ' %'  : '—'}</td>
-      <td>${bs.co2         != null ? bs.co2         + ' ppm': '—'}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">Нет данных</td></tr>';
-
-  // график — средняя температура по корпусу за последние 24 часа (по данным всех датчиков, усредненным в 2-часовые интервалы)
-  let labels = [];
-  let values = [];
-
+  let labels = [], values = [];
   if (chartData && chartData.length > 0) {
     const tMap = {};
     chartData.forEach(d => {
-       const v = parseFloat(d.value);
-       if(!isNaN(v)) {
-          if(!tMap[d.time]) tMap[d.time] = {sum:0, cnt:0};
-          tMap[d.time].sum += v;
-          tMap[d.time].cnt += 1;
-       }
+      const v = parseFloat(d.value);
+      if (!isNaN(v)) {
+        if (!tMap[d.time]) tMap[d.time] = {sum:0, cnt:0};
+        tMap[d.time].sum += v; tMap[d.time].cnt += 1;
+      }
     });
     const times = Object.keys(tMap).sort();
     labels = times.map(t => formatTime(t));
-    values = times.map(t => +(tMap[t].sum / tMap[t].cnt).toFixed(1));
+    values = times.map(t => +(tMap[t].sum/tMap[t].cnt).toFixed(1));
   } else {
-    // Безопасный фоллбек, если нет данных за период
-    labels = ['Нет данных'];
-    values = [0];
+    labels = ['Нет данных']; values = [0];
   }
 
-  // Рисуем график сразу
   const ctx = document.getElementById('dashChart');
   if (ctx) {
     chartDash = new Chart(ctx, {
       type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Ср. температура по ВУЗу (°C)',
-          data: values,
-          borderColor: '#e74c3c',
-          backgroundColor: 'rgba(231,76,60,.1)',
-          fill: true,
-          tension: 0.3,
-          pointRadius: 3
-        }]
-      },
+      data: { labels, datasets: [{
+        label: 'Ср. температура по ВУЗу (°C)',
+        data: values, borderColor: '#e74c3c',
+        backgroundColor: 'rgba(231,76,60,.1)', fill: true, tension: 0.3, pointRadius: 3
+      }]},
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: true, position: 'top' } },
         scales: { x: { ticks: { maxTicksLimit: 15 } } }
       }
     });
   }
+}
+
+function filterDashTable() {
+  const fn = (g('fDBN')?.value || '').toLowerCase();
+  const tn = nul('fDTn'), tx = nul('fDTx');
+  const hn = nul('fDHn'), hx = nul('fDHx');
+  const cn = nul('fDCn'), cx = nul('fDCx');
+  const f = dashBldgData.filter(b =>
+    (!fn || b.name.toLowerCase().includes(fn)) &&
+    (tn == null || b.temperature == null || b.temperature >= tn) &&
+    (tx == null || b.temperature == null || b.temperature <= tx) &&
+    (hn == null || b.humidity    == null || b.humidity    >= hn) &&
+    (hx == null || b.humidity    == null || b.humidity    <= hx) &&
+    (cn == null || b.co2         == null || b.co2         >= cn) &&
+    (cx == null || b.co2         == null || b.co2         <= cx)
+  );
+  g('dashTBody').innerHTML = f.map(b => `<tr>
+    <td>${b.name}</td>
+    <td>${b.temperature != null ? b.temperature + ' °C' : '—'}</td>
+    <td>${b.humidity    != null ? b.humidity    + ' %'  : '—'}</td>
+    <td>${b.co2         != null ? b.co2         + ' ppm': '—'}</td>
+  </tr>`).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">Нет данных</td></tr>';
+  if (g('dashCount')) g('dashCount').innerHTML = renderCount(f.length);
 }
 
 function sc(icon, label, val, cls) {
@@ -811,25 +1209,34 @@ function sc(icon, label, val, cls) {
     </div></div>`;
 }
 
-
-// Корпуса
+// ── Корпуса ──
 
 async function loadBuildings() {
-  bldgAll = await api('GET', '/buildings') || [];
-  bldgFlt = [...bldgAll];
-  renderBldg(bldgFlt);
+  bldgPage = 1;
+  await fetchBldg();
 }
-function filterBldg() {
-  const n = g('fBN').value.toLowerCase();
-  const a = g('fBA').value.toLowerCase();
-  const s = g('fBS').value;
-  bldgFlt = bldgAll.filter(b =>
-    b.name.toLowerCase().includes(n) &&
-    b.address.toLowerCase().includes(a) &&
-    (!s || b.status === s)
-  );
+function filterBldg() { bldgPage = 1; fetchBldg(); }
+function bldgGoPage(p) { bldgPage = p; fetchBldg(); }
+
+async function fetchBldg() {
+  const p = new URLSearchParams({ page: bldgPage, page_size: PAGE_SIZE });
+  const n = g('fBN')?.value; if (n) p.set('name', n);
+  const a = g('fBA')?.value; if (a) p.set('address', a);
+  const s = g('fBS')?.value; if (s) p.set('status', s);
+  const f1 = g('fBF1')?.value; if (f1) p.set('floors_min', f1);
+  const f2 = g('fBF2')?.value; if (f2) p.set('floors_max', f2);
+  const cf = g('fBCf')?.value; if (cf) p.set('created_from', cf);
+  const ct = g('fBCt')?.value; if (ct) p.set('created_to', ct);
+  const uf = g('fBUf')?.value; if (uf) p.set('updated_from', uf);
+  const ut = g('fBUt')?.value; if (ut) p.set('updated_to', ut);
+  const r = await api('GET', '/buildings?' + p.toString());
+  bldgFlt = r?.items || [];
+  bldgTotal = r?.total || 0;
   renderBldg(bldgFlt);
+  if (g('bldgCount')) g('bldgCount').innerHTML = renderCount(bldgTotal);
+  if (g('bldgPagination')) g('bldgPagination').innerHTML = renderPagination(bldgTotal, bldgPage, PAGE_SIZE, 'bldgGoPage');
 }
+
 function sortBldg(field, th) {
   sDir[field] = !sDir[field];
   bldgFlt.sort((a,b) => {
@@ -843,71 +1250,184 @@ function sortBldg(field, th) {
 }
 function renderBldg(data) {
   g('bldgTBody').innerHTML = data.map(b => `<tr style="cursor:pointer"
-    onclick="goFloors(${qj(b)})">
+    onclick="goBldgDetail(${qj(b)})">
     <td>${b.name}</td><td>${b.address}</td><td>${b.floors_count}</td>
     <td><span class="bstat bstat-${b.status}">${b.status}</span></td>
+    <td class="dt-small">${formatDateTime(b.created_at)}</td>
+    <td class="dt-small">${formatDateTime(b.updated_at)}</td>
     <td class="admin-only" onclick="event.stopPropagation()">
+      <button class="btn btn-sm btn-outline-secondary me-1"
+        onclick="goBldgDetail(${qj(b)})"><i class="bi bi-eye"></i></button>
       <button class="btn btn-sm btn-outline-primary me-1"
         onclick="openBldgModal(${qj(b)})"><i class="bi bi-pencil"></i></button>
       <button class="btn btn-sm btn-outline-danger"
         onclick="delBldg('${b.id}')"><i class="bi bi-trash"></i></button>
     </td>
   </tr>`).join('') ||
-    '<tr><td colspan="5" class="text-center text-muted py-3">Нет данных</td></tr>';
+    '<tr><td colspan="7" class="text-center text-muted py-3">Нет данных</td></tr>';
   applyRole();
 }
 function openBldgModal(b) {
-  g('mbId').value = b?.id || '';
-  g('mbName').value = b?.name || '';
-  g('mbAddr').value = b?.address || '';
-  g('mbFloors').value = b?.floors_count || 1;
-  g('mbStatus').value = b?.status || 'Active';
+  g('mbId').value      = b?.id || '';
+  g('mbName').value    = b?.name || '';
+  g('mbAddr').value    = b?.address || '';
+  g('mbFloors').value  = b?.floors_count || 1;
+  g('mbStatus').value  = b?.status || 'Active';
   g('mBldgTitle').textContent = b ? 'Редактировать корпус' : 'Добавить корпус';
   new bootstrap.Modal(g('mBldg')).show();
 }
 async function saveBldg() {
-  const id = g('mbId').value;
-  const body = {name:g('mbName').value, address:g('mbAddr').value,
-    floors_count:+g('mbFloors').value, status:g('mbStatus').value};
-  const r = id ? await api('PUT','/buildings/'+id,body)
-               : await api('POST','/buildings',body);
-  if (!r) return;
-  bootstrap.Modal.getInstance(g('mBldg'))?.hide();
-  toast(id ? 'Корпус обновлён' : 'Корпус добавлен', 'success');
-  loadBuildings();
+  const floors = +g('mbFloors').value;
+  if (!floors || floors < 1) { toast('Количество этажей должно быть не менее 1','warning'); return; }
+  const btn = document.querySelector('#mBldg .btn-primary');
+  btn.disabled = true;
+  try {
+    const id = g('mbId').value;
+    const body = {name:g('mbName').value, address:g('mbAddr').value,
+      floors_count:floors, status:g('mbStatus').value};
+    const r = id ? await api('PUT','/buildings/'+id,body) : await api('POST','/buildings',body);
+    if (!r) return;
+    bootstrap.Modal.getInstance(g('mBldg'))?.hide();
+    toast(id ? 'Корпус обновлён' : 'Корпус добавлен','success');
+    loadBuildings();
+    if (id && ctxBldg?.id === id) { ctxBldg = r; goBldgDetail(r); }
+  } finally {
+    btn.disabled = false;
+  }
 }
 async function delBldg(id) {
   if (!confirm('Удалить корпус?')) return;
-  await api('DELETE', '/buildings/' + id);
+  await api('DELETE','/buildings/'+id);
   toast('Корпус удалён','success'); loadBuildings();
 }
 
+// ── Страница деталей корпуса ──
 
-// Этажи
-
-async function loadFloors(bid) {
-  const [floors, allRooms] = await Promise.all([
-    api('GET', '/buildings/' + bid + '/floors'),
-    api('GET', '/rooms?building_id=' + bid),
+async function loadBldgDetail(bid) {
+  const [bldg, floors, allRooms] = await Promise.all([
+    api('GET', '/buildings/'+bid),
+    api('GET', '/buildings/'+bid+'/floors'),
+    apiAll('/rooms?building_id='+bid),
   ]);
-  g('floorsTBody').innerHTML = (floors||[]).map(f => {
-    const rc = (allRooms||[]).filter(r=>r.floor_id===f.id).length;
-    return `<tr style="cursor:pointer"
-      onclick="goRoomsOfFloor(${qj(f)},${qj(ctxBldg)})">
-      <td>Этаж ${f.floor_number}</td><td>${rc}</td>
-      <td><span class="bstat bstat-${f.status}">${f.status}</span></td>
-      <td class="admin-only" onclick="event.stopPropagation()">
-        <button class="btn btn-sm btn-outline-primary me-1"
-          onclick="openFloorModal(${qj(f)})"><i class="bi bi-pencil"></i></button>
-        <button class="btn btn-sm btn-outline-danger"
-          onclick="delFloor('${f.id}')"><i class="bi bi-trash"></i></button>
-      </td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">Нет этажей</td></tr>';
+  if (!bldg) return;
+  ctxBldg = bldg;
+  g('bldgDetailBc').textContent = bldg.name;
+  g('bldgDetailH').textContent  = bldg.name;
+  g('bldgDetailInfo').innerHTML = `
+    <div class="col-md-5">
+      <div class="card"><div class="card-body">
+        <h6 class="mb-3">Информация о корпусе</h6>
+        <table class="table table-sm table-borderless mb-0">
+          <tr><td class="text-muted" style="width:40%">Название</td><td><b>${bldg.name}</b></td></tr>
+          <tr><td class="text-muted">Адрес</td><td>${bldg.address}</td></tr>
+          <tr><td class="text-muted">Этажей</td><td>${bldg.floors_count}</td></tr>
+          <tr><td class="text-muted">Статус</td>
+            <td><span class="bstat bstat-${bldg.status}">${bldg.status}</span></td></tr>
+          <tr><td class="text-muted">Создан</td><td>${formatDateTime(bldg.created_at)}</td></tr>
+          <tr><td class="text-muted">Изменён</td><td>${formatDateTime(bldg.updated_at)}</td></tr>
+        </table>
+      </div></div>
+    </div>`;
+  bldgDetailAll = (floors||[]).map(f => ({
+    ...f,
+    _rc: (allRooms||[]).filter(r => r.floor_id === f.id).length
+  }));
+  filterBldgDetailFloors();
+}
+
+function filterBldgDetailFloors() { bldgDetailPage = 1; renderBldgDetailFloors(); }
+function bldgDetailGoPage(p) { bldgDetailPage = p; renderBldgDetailFloors(); }
+
+function renderBldgDetailFloors() {
+  const f1 = g('fBDF1')?.value ? +g('fBDF1').value : null;
+  const f2 = g('fBDF2')?.value ? +g('fBDF2').value : null;
+  const fs = g('fBDFS')?.value || '';
+  const cf = g('fBDFCf')?.value || '', ct = g('fBDFCt')?.value || '';
+  const uf = g('fBDFUf')?.value || '', ut = g('fBDFUt')?.value || '';
+  bldgDetailFlt = bldgDetailAll.filter(f =>
+    (f1 == null || f.floor_number >= f1) &&
+    (f2 == null || f.floor_number <= f2) &&
+    (!fs || f.status === fs) &&
+    (!cf || (f.created_at||'') >= cf) &&
+    (!ct || (f.created_at||'') <= ct + 'T23:59:59Z') &&
+    (!uf || (f.updated_at||'') >= uf) &&
+    (!ut || (f.updated_at||'') <= ut + 'T23:59:59Z')
+  );
+  bldgDetailTotal = bldgDetailFlt.length;
+  const start = (bldgDetailPage - 1) * PAGE_SIZE;
+  const page = bldgDetailFlt.slice(start, start + PAGE_SIZE);
+  g('bldgDetailFloorsTBody').innerHTML = page.map(f => `<tr style="cursor:pointer"
+    onclick="goFloorDetail(${qj(f)},${qj(ctxBldg)})">
+    <td>Этаж ${f.floor_number}</td><td>${f._rc}</td>
+    <td><span class="bstat bstat-${f.status}">${f.status}</span></td>
+    <td class="dt-small">${formatDateTime(f.created_at)}</td>
+    <td class="dt-small">${formatDateTime(f.updated_at)}</td>
+    <td class="admin-only" onclick="event.stopPropagation()">
+      <button class="btn btn-sm btn-outline-primary me-1"
+        onclick="openFloorModal(${qj(f)})"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger"
+        onclick="delFloor('${f.id}')"><i class="bi bi-trash"></i></button>
+    </td>
+  </tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">Нет этажей</td></tr>';
+  if (g('bldgDetailFloorsCount')) g('bldgDetailFloorsCount').innerHTML = renderCount(bldgDetailTotal);
+  if (g('bldgDetailFloorsPagination')) g('bldgDetailFloorsPagination').innerHTML = renderPagination(bldgDetailTotal, bldgDetailPage, PAGE_SIZE, 'bldgDetailGoPage');
   applyRole();
 }
+
+function editBldgDetail() { if (ctxBldg) openBldgModal(ctxBldg); }
+
+// ── Этажи ──
+
+async function loadFloors(bid) {
+  floorsPage = 1;
+  // Cache room counts for this building
+  const allRooms = await apiAll('/rooms?building_id=' + bid);
+  _floorsRoomMap = {};
+  allRooms.forEach(r => { _floorsRoomMap[r.floor_id] = (_floorsRoomMap[r.floor_id]||0)+1; });
+  await fetchFloors();
+}
+function filterFloors() { floorsPage = 1; fetchFloors(); }
+function floorsGoPage(p) { floorsPage = p; fetchFloors(); }
+
+async function fetchFloors() {
+  const bid = ctxBldg?.id; if (!bid) return;
+  const p = new URLSearchParams({ building_id: bid, page: floorsPage, page_size: PAGE_SIZE });
+  const n1 = g('fFN1')?.value; if (n1) p.set('floor_min', n1);
+  const n2 = g('fFN2')?.value; if (n2) p.set('floor_max', n2);
+  const fs = g('fFS')?.value;  if (fs) p.set('status', fs);
+  const cf = g('fFCf')?.value; if (cf) p.set('created_from', cf);
+  const ct = g('fFCt')?.value; if (ct) p.set('created_to', ct);
+  const uf = g('fFUf')?.value; if (uf) p.set('updated_from', uf);
+  const ut = g('fFUt')?.value; if (ut) p.set('updated_to', ut);
+  const tn = g('fFTn')?.value; if (tn) p.set('temp_min', tn);
+  const tx = g('fFTx')?.value; if (tx) p.set('temp_max', tx);
+  const hn = g('fFHn')?.value; if (hn) p.set('hum_min', hn);
+  const hx = g('fFHx')?.value; if (hx) p.set('hum_max', hx);
+  const cn = g('fFCOn')?.value; if (cn) p.set('co2_min', cn);
+  const cx = g('fFCOx')?.value; if (cx) p.set('co2_max', cx);
+  const r = await api('GET', '/floors?' + p.toString());
+  const items = (r?.items || []).map(f => ({...f, _rc: _floorsRoomMap[f.id]||0}));
+  floorsTotal = r?.total || 0;
+  g('floorsTBody').innerHTML = items.map(f => `<tr style="cursor:pointer"
+    onclick="goFloorDetail(${qj(f)},${qj(ctxBldg)})">
+    <td>Этаж ${f.floor_number}</td><td>${f._rc}</td>
+    <td><span class="bstat bstat-${f.status}">${f.status}</span></td>
+    <td class="dt-small">${formatDateTime(f.created_at)}</td>
+    <td class="dt-small">${formatDateTime(f.updated_at)}</td>
+    <td class="admin-only" onclick="event.stopPropagation()">
+      <button class="btn btn-sm btn-outline-primary me-1"
+        onclick="openFloorModal(${qj(f)})"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger"
+        onclick="delFloor('${f.id}')"><i class="bi bi-trash"></i></button>
+    </td>
+  </tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">Нет этажей</td></tr>';
+  if (g('floorsCount')) g('floorsCount').innerHTML = renderCount(floorsTotal);
+  if (g('floorsPagination')) g('floorsPagination').innerHTML = renderPagination(floorsTotal, floorsPage, PAGE_SIZE, 'floorsGoPage');
+  applyRole();
+}
+
 function openFloorModal(f) {
-  g('mfId').value = f?.id || '';
+  g('mfId').value  = f?.id || '';
   g('mfBid').value = ctxBldg?.id || '';
   g('mfNum').value = f?.floor_number || 1;
   g('mfSt').value  = f?.status || 'Active';
@@ -915,76 +1435,136 @@ function openFloorModal(f) {
 }
 async function saveFloor() {
   const id = g('mfId').value, bid = g('mfBid').value;
-  const body = {building_id:bid, floor_number:+g('mfNum').value, status:g('mfSt').value};
-  const r = id ? await api('PUT','/floors/'+id,body) : await api('POST','/floors',body);
-  if (!r) return;
-  bootstrap.Modal.getInstance(g('mFloor'))?.hide();
-  toast('Сохранено','success'); loadFloors(bid);
+  const num = +g('mfNum').value;
+  if (!num || num < 1) { toast('Номер этажа должен быть не менее 1','warning'); return; }
+  const btn = document.querySelector('#mFloor .btn-primary');
+  btn.disabled = true;
+  try {
+    const body = {building_id:bid, floor_number:num, status:g('mfSt').value};
+    const r = id ? await api('PUT','/floors/'+id,body) : await api('POST','/floors',body);
+    if (!r) return;
+    bootstrap.Modal.getInstance(g('mFloor'))?.hide();
+    toast('Сохранено','success');
+    loadFloors(bid);
+    if (ctxBldg?.id === bid) loadBldgDetail(bid);
+  } finally {
+    btn.disabled = false;
+  }
 }
 async function delFloor(id) {
   if (!confirm('Удалить этаж?')) return;
-  await api('DELETE', '/floors/' + id);
-  toast('Удалён','success'); loadFloors(ctxBldg.id);
+  await api('DELETE','/floors/'+id);
+  toast('Удалён','success');
+  if (ctxBldg) loadFloors(ctxBldg.id);
 }
 
+// ── Страница деталей этажа ──
 
-// Комнаты
-
-async function loadRooms(bid, fid) {
-  let url = '/rooms';
-  const p = []; if (bid) p.push('building_id='+bid); if (fid) p.push('floor_id='+fid);
-  if (p.length) url += '?' + p.join('&');
-
-  const [rooms, blds, reads] = await Promise.all([
-    api('GET', url),
-    api('GET', '/buildings'),
+async function loadFloorDetail(floor, bldg) {
+  const [rooms, reads] = await Promise.all([
+    api('GET', '/rooms?floor_id='+floor.id),
     api('GET', '/readings/latest'),
   ]);
-  roomsAll = rooms || [];
-
-  const bMap = Object.fromEntries((blds||[]).map(b=>[b.id,b.name]));
   const rMap = {};
   (reads||[]).forEach(r => { rMap[r.room_id+'_'+r.metric_type] = r.value; });
-
-  roomsAll.forEach(r => {
-    r._bn  = bMap[r.building_id] || r.building_id;
-    r._fn  = parseInt(r.floor_id?.split('-').pop() || 0);
-    r._tmp = rMap[r.id+'_temperature'];
-    r._hum = rMap[r.id+'_humidity'];
-    r._co2 = rMap[r.id+'_co2'];
-  });
-  filterRooms();
-}
-function filterRooms() {
-  const fn = g('fRN').value.toLowerCase(), ft = g('fRT').value.toLowerCase(),
-        fb = g('fRB').value.toLowerCase(), fs = g('fRS').value;
-  const f = roomsAll.filter(r =>
-    (!fn || r.room_number.toLowerCase().includes(fn)) &&
-    (!ft || r.type.toLowerCase().includes(ft)) &&
-    (!fb || r._bn.toLowerCase().includes(fb)) &&
-    (!fs || r.status === fs)
-  );
-  g('roomsTBody').innerHTML = f.map(r => `<tr>
-    <td><a href="#" onclick="goRoomDetail(${qj(r)})">${r.room_number}</a></td>
+  const floorRooms = (rooms||[]).map(r => ({
+    ...r,
+    _tmp: rMap[r.id+'_temperature'],
+    _hum: rMap[r.id+'_humidity'],
+    _co2: rMap[r.id+'_co2'],
+  }));
+  g('floorDetailInfo').innerHTML = `
+    <div class="col-md-5">
+      <div class="card"><div class="card-body">
+        <h6 class="mb-3">Информация об этаже</h6>
+        <table class="table table-sm table-borderless mb-0">
+          <tr><td class="text-muted" style="width:40%">Корпус</td><td>${bldg.name}</td></tr>
+          <tr><td class="text-muted">Номер этажа</td><td><b>${floor.floor_number}</b></td></tr>
+          <tr><td class="text-muted">Статус</td>
+            <td><span class="bstat bstat-${floor.status}">${floor.status}</span></td></tr>
+          <tr><td class="text-muted">Создан</td><td>${formatDateTime(floor.created_at)}</td></tr>
+          <tr><td class="text-muted">Изменён</td><td>${formatDateTime(floor.updated_at)}</td></tr>
+        </table>
+      </div></div>
+    </div>`;
+  g('floorDetailRoomsTBody').innerHTML = floorRooms.map(r => `<tr style="cursor:pointer"
+    onclick="goRoomDetail(${qj(r)})">
+    <td><a href="#">${r.room_number}</a></td>
     <td>${r.type}</td><td>${r.area} м²</td>
-    <td>${r._bn} / Эт.${r._fn}</td>
     <td>${fv(r._tmp,'°C')}</td><td>${fv(r._hum,'%')}</td><td>${fv(r._co2,' ppm')}</td>
     <td><span class="bstat bstat-${r.status}">${r.status}</span></td>
+    <td class="dt-small">${formatDateTime(r.created_at)}</td>
+    <td class="dt-small">${formatDateTime(r.updated_at)}</td>
+  </tr>`).join('') || '<tr><td colspan="9" class="text-center text-muted py-3">Нет помещений</td></tr>';
+}
+
+function editFloorDetail() { if (ctxFloor) openFloorModal(ctxFloor); }
+
+// ── Помещения ──
+
+async function loadRooms(bid, fid) {
+  roomsPage = 1;
+  _roomsCtxBid = bid; _roomsCtxFid = fid;
+  [_roomsBlds, _roomsReads] = await Promise.all([
+    apiAll('/buildings'),
+    api('GET', '/readings/latest'),
+  ]);
+  _roomsReads = _roomsReads || [];
+  await fetchRooms();
+}
+function filterRooms() { roomsPage = 1; fetchRooms(); }
+function roomsGoPage(p) { roomsPage = p; fetchRooms(); }
+
+async function fetchRooms() {
+  const p = new URLSearchParams({ page: roomsPage, page_size: PAGE_SIZE });
+  if (_roomsCtxBid) p.set('building_id', _roomsCtxBid);
+  if (_roomsCtxFid) p.set('floor_id', _roomsCtxFid);
+  const fn = g('fRN')?.value; if (fn) p.set('room_number', fn);
+  const ft = g('fRT')?.value; if (ft) p.set('type', ft);
+  const fs = g('fRS')?.value; if (fs) p.set('status', fs);
+  const a1 = g('fRA1')?.value; if (a1) p.set('area_min', a1);
+  const a2 = g('fRA2')?.value; if (a2) p.set('area_max', a2);
+  const r = await api('GET', '/rooms?' + p.toString());
+  const bMap = Object.fromEntries((_roomsBlds||[]).map(b=>[b.id,b.name]));
+  const rMap = {};
+  _roomsReads.forEach(rd => { rMap[rd.room_id+'_'+rd.metric_type] = rd.value; });
+  const items = (r?.items||[]).map(room => ({...room,
+    _bn: bMap[room.building_id]||room.building_id,
+    _fn: parseInt(room.floor_id?.split('-').pop()||0),
+    _tmp: rMap[room.id+'_temperature'],
+    _hum: rMap[room.id+'_humidity'],
+    _co2: rMap[room.id+'_co2'],
+  }));
+  const fb = (g('fRB')?.value||'').toLowerCase();
+  const shown = fb ? items.filter(r=>r._bn.toLowerCase().includes(fb)) : items;
+  roomsTotal = fb ? shown.length : (r?.total||0);
+  g('roomsTBody').innerHTML = shown.map(room => `<tr>
+    <td><a href="#" onclick="goRoomDetail(${qj(room)})">${room.room_number}</a></td>
+    <td>${room.type}</td><td>${room.area} м²</td>
+    <td>${room._bn} / Эт.${room._fn}</td>
+    <td>${fv(room._tmp,'°C')}</td><td>${fv(room._hum,'%')}</td><td>${fv(room._co2,' ppm')}</td>
+    <td><span class="bstat bstat-${room.status}">${room.status}</span></td>
+    <td class="dt-small">${formatDateTime(room.created_at)}</td>
+    <td class="dt-small">${formatDateTime(room.updated_at)}</td>
     <td class="admin-only">
       <button class="btn btn-sm btn-outline-primary me-1"
-        onclick="openRoomModal(${qj(r)})"><i class="bi bi-pencil"></i></button>
+        onclick="openRoomModal(${qj(room)})"><i class="bi bi-pencil"></i></button>
       <button class="btn btn-sm btn-outline-danger"
-        onclick="delRoom('${r.id}')"><i class="bi bi-trash"></i></button>
+        onclick="delRoom('${room.id}')"><i class="bi bi-trash"></i></button>
     </td>
-  </tr>`).join('') || '<tr><td colspan="9" class="text-center text-muted py-3">Нет данных</td></tr>';
+  </tr>`).join('') || '<tr><td colspan="11" class="text-center text-muted py-3">Нет данных</td></tr>';
+  if (g('roomsCount')) g('roomsCount').innerHTML = renderCount(r?.total||0);
+  if (g('roomsPagination')) g('roomsPagination').innerHTML = renderPagination(r?.total||0, roomsPage, PAGE_SIZE, 'roomsGoPage');
   applyRole();
 }
+
 async function loadRoomDetail(rid) {
-  const [room, blds, sensors] = await Promise.all([
+  const [room, blds, sensorsR] = await Promise.all([
     api('GET', '/rooms/'+rid),
-    api('GET', '/buildings'),
-    api('GET', '/sensors?room_id='+rid),
+    apiAll('/buildings'),
+    apiAll('/sensors?room_id='+rid),
   ]);
+  const sensors = sensorsR;
   if (!room) return;
   ctxRoom = room;
   const bn = (blds||[]).find(b=>b.id===room.building_id)?.name || room.building_id;
@@ -1004,6 +1584,8 @@ async function loadRoomDetail(rid) {
           <tr><td class="text-muted">Статус</td>
             <td><span class="bstat bstat-${room.status}">${room.status}</span></td></tr>
           <tr><td class="text-muted">Комментарий</td><td>${room.comment||'—'}</td></tr>
+          <tr><td class="text-muted">Создан</td><td>${formatDateTime(room.created_at)}</td></tr>
+          <tr><td class="text-muted">Изменён</td><td>${formatDateTime(room.updated_at)}</td></tr>
         </table>
       </div></div>
     </div>
@@ -1028,8 +1610,8 @@ async function loadRoomDetail(rid) {
               <b>${s.last_value!=null?s.last_value:'—'}</b>
               <span class="bstat bstat-${s.status}">${s.status}</span>
               <button class="btn btn-sm btn-outline-secondary"
-                onclick="goSensorHistory('${s.id}')">
-                <i class="bi bi-clock-history"></i></button>
+                onclick="goSenDetail(${qj(s)})">
+                <i class="bi bi-eye"></i></button>
             </div>
           </div>`).join('')}
       </div></div>
@@ -1050,7 +1632,7 @@ function mp(type, label, metric, unit) {
 function editRoomDetail() { if (ctxRoom) openRoomModal(ctxRoom); }
 async function openRoomModal(r) {
   g('mrId').value = r?.id || '';
-  const blds = await api('GET','/buildings') || [];
+  const blds = await apiAll('/buildings');
   g('mrBldg').innerHTML = blds.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
   if (r) g('mrBldg').value = r.building_id;
   await fillFloors4Room();
@@ -1072,14 +1654,20 @@ async function fillFloors4Room() {
 }
 async function saveRoom() {
   const id = g('mrId').value, fid = g('mrFloor').value, bid = g('mrBldg').value;
-  const body = {floor_id:fid, building_id:bid, room_number:g('mrNum').value,
-    type:g('mrType').value, area:+g('mrArea').value,
-    comment:g('mrCmt').value, status:g('mrSt').value};
-  const r = id ? await api('PUT','/rooms/'+id,body) : await api('POST','/rooms',body);
-  if (!r) return;
-  bootstrap.Modal.getInstance(g('mRoom'))?.hide();
-  toast('Помещение сохранено','success');
-  loadRooms(ctxBldg?.id, ctxFloor?.id);
+  const btn = document.querySelector('#mRoom .btn-primary');
+  btn.disabled = true;
+  try {
+    const body = {floor_id:fid, building_id:bid, room_number:g('mrNum').value,
+      type:g('mrType').value, area:+g('mrArea').value,
+      comment:g('mrCmt').value, status:g('mrSt').value};
+    const r = id ? await api('PUT','/rooms/'+id,body) : await api('POST','/rooms',body);
+    if (!r) return;
+    bootstrap.Modal.getInstance(g('mRoom'))?.hide();
+    toast('Помещение сохранено','success');
+    loadRooms(ctxBldg?.id, ctxFloor?.id);
+  } finally {
+    btn.disabled = false;
+  }
 }
 async function delRoom(id) {
   if (!confirm('Удалить помещение?')) return;
@@ -1087,44 +1675,60 @@ async function delRoom(id) {
   toast('Удалено','success'); loadRooms(ctxBldg?.id, ctxFloor?.id);
 }
 
-// Сенсоры
+// ── Датчики ──
 
 async function loadSensors() {
-  const [sensors, blds, reads] = await Promise.all([
-    api('GET','/sensors'),
-    api('GET','/buildings'),
-    api('GET','/readings/latest'),
+  sensorsPage = 1;
+  [_sensorsBlds, _sensorsRooms, _sensorsReads] = await Promise.all([
+    apiAll('/buildings'),
+    apiAll('/rooms'),
+    api('GET', '/readings/latest'),
   ]);
-  sensorsAll = sensors || [];
-  const bMap = Object.fromEntries((blds||[]).map(b=>[b.id,b.name]));
-  const lv = {};
-  (reads||[]).forEach(r=>{ lv[r.sensor_id+'_'+r.metric_type]=r.value; });
-  sensorsAll.forEach(s=>{
-    s._bn = bMap[s.building_id] || s.building_id;
-    s.last_value = lv[s.id+'_'+s.metric_type];
-  });
-  filterSensors();
+  _sensorsReads = _sensorsReads || [];
+  await fetchSensors();
 }
-function filterSensors() {
-  const fi=g('fSI').value.toLowerCase(), ft=g('fST').value,
-        fm=g('fSM').value.toLowerCase(), fb=g('fSB').value.toLowerCase(),
-        fs=g('fSS').value;
-  const f = sensorsAll.filter(s=>
-    (!fi||s.id.toLowerCase().includes(fi)) &&
-    (!ft||s.metric_type===ft) &&
-    (!fm||s.model.toLowerCase().includes(fm)) &&
-    (!fb||s._bn.toLowerCase().includes(fb)) &&
-    (!fs||s.status===fs)
-  );
-  g('sensorsTBody').innerHTML = f.map(s=>`<tr>
+function filterSensors() { sensorsPage = 1; fetchSensors(); }
+function sensorsGoPage(p) { sensorsPage = p; fetchSensors(); }
+
+async function fetchSensors() {
+  const p = new URLSearchParams({ page: sensorsPage, page_size: PAGE_SIZE });
+  const fi = g('fSI')?.value; if (fi) p.set('sensor_id', fi);
+  const ft = g('fST')?.value; if (ft) p.set('metric_type', ft);
+  const fm = g('fSM')?.value; if (fm) p.set('model', fm);
+  const fs = g('fSS')?.value; if (fs) p.set('status', fs);
+  const cf = g('fSCf')?.value; if (cf) p.set('created_from', cf);
+  const ct = g('fSCt')?.value; if (ct) p.set('created_to', ct);
+  const uf = g('fSUf')?.value; if (uf) p.set('updated_from', uf);
+  const ut = g('fSUt')?.value; if (ut) p.set('updated_to', ut);
+  const r = await api('GET', '/sensors?' + p.toString());
+  const bMap = Object.fromEntries((_sensorsBlds||[]).map(b=>[b.id,b.name]));
+  const rMap = Object.fromEntries((_sensorsRooms||[]).map(rm=>[rm.id, rm.room_number+' ('+rm.type+')']));
+  const lv = {};
+  _sensorsReads.forEach(rd=>{ lv[rd.sensor_id+'_'+rd.metric_type]=rd.value; });
+  let items = (r?.items||[]).map(s=>({...s,
+    _bn: bMap[s.building_id]||s.building_id,
+    _rn: rMap[s.room_id]||s.room_id,
+    last_value: lv[s.id+'_'+s.metric_type]??s.last_value,
+  }));
+  // Client-side building/room text filter (not sent to server since they match display names)
+  const fb = (g('fSB')?.value||'').toLowerCase();
+  const fr = (g('fSR')?.value||'').toLowerCase();
+  if (fb) items = items.filter(s=>s._bn.toLowerCase().includes(fb));
+  if (fr) items = items.filter(s=>s._rn.toLowerCase().includes(fr)||s.room_id.toLowerCase().includes(fr));
+  sensorsAll = items;
+  g('sensorsTBody').innerHTML = items.map(s=>`<tr>
     <td><small class="text-muted">${s.id}</small></td>
     <td><span class="mpill ${s.metric_type}">${s.metric_type}</span></td>
     <td>${s.model}</td>
-    <td><small>${s.room_id}</small></td>
+    <td><small>${s._rn}</small></td>
     <td>${s._bn}</td>
     <td><b>${s.last_value!=null?s.last_value:'—'}</b></td>
     <td><span class="bstat bstat-${s.status}">${s.status}</span></td>
+    <td class="dt-small">${formatDateTime(s.created_at)}</td>
+    <td class="dt-small">${formatDateTime(s.updated_at)}</td>
     <td>
+      <button class="btn btn-sm btn-outline-secondary me-1"
+        onclick="goSenDetail(${qj(s)})"><i class="bi bi-eye"></i></button>
       <button class="btn btn-sm btn-outline-secondary me-1"
         onclick="goSensorHistory('${s.id}')"><i class="bi bi-clock-history"></i></button>
       <button class="btn btn-sm btn-outline-primary admin-only me-1"
@@ -1132,12 +1736,80 @@ function filterSensors() {
       <button class="btn btn-sm btn-outline-danger admin-only"
         onclick="delSensor('${s.id}')"><i class="bi bi-trash"></i></button>
     </td>
-  </tr>`).join('') || '<tr><td colspan="8" class="text-center text-muted py-3">Нет данных</td></tr>';
+  </tr>`).join('') || '<tr><td colspan="10" class="text-center text-muted py-3">Нет данных</td></tr>';
+  const total = r?.total || 0;
+  if (g('sensorsCount')) g('sensorsCount').innerHTML = renderCount(total);
+  if (g('sensorsPagination')) g('sensorsPagination').innerHTML = renderPagination(total, sensorsPage, PAGE_SIZE, 'sensorsGoPage');
   applyRole();
 }
+
+// ── Страница деталей датчика ──
+
+async function loadSenDetail(s) {
+  const [blds, sensor, history] = await Promise.all([
+    apiAll('/buildings'),
+    api('GET', '/sensors/'+s.id),
+    api('GET', '/sensors/'+s.id+'/history?start=-7d'),
+  ]);
+  const bn = (blds||[]).find(b=>b.id===s.building_id)?.name || s.building_id;
+  const unit = {temperature:'°C', humidity:'%', co2:' ppm'}[s.metric_type] || '';
+  const lastVal = sensor?.last_value != null ? sensor.last_value + unit : '—';
+  const recentHistory = (history||[]).slice(0,5);
+  const histHTML = recentHistory.map(h => `
+    <tr>
+      <td>${formatDateTime(h.time)}</td>
+      <td><span class="bstat bstat-${h.old_status}">${h.old_status}</span></td>
+      <td><span class="bstat bstat-${h.new_status}">${h.new_status}</span></td>
+      <td>${h.reason||'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">Нет событий</td></tr>';
+  g('senDetailBody').innerHTML = `
+    <div class="col-md-4">
+      <div class="card mb-3"><div class="card-body">
+        <h6 class="mb-3">Информация о датчике</h6>
+        <table class="table table-sm table-borderless mb-0">
+          <tr><td class="text-muted" style="width:45%">ID</td><td><small>${s.id}</small></td></tr>
+          <tr><td class="text-muted">Тип</td>
+            <td><span class="mpill ${s.metric_type}">${s.metric_type}</span></td></tr>
+          <tr><td class="text-muted">Модель</td><td>${s.model}</td></tr>
+          <tr><td class="text-muted">Корпус</td><td>${bn}</td></tr>
+          <tr><td class="text-muted">Помещение</td><td>${s._rn||s.room_id}</td></tr>
+          <tr><td class="text-muted">Статус</td>
+            <td><span class="bstat bstat-${s.status}">${s.status}</span></td></tr>
+          <tr><td class="text-muted">Последнее значение</td><td><b>${lastVal}</b></td></tr>
+          <tr><td class="text-muted">Создан</td><td>${formatDateTime(s.created_at)}</td></tr>
+          <tr><td class="text-muted">Изменён</td><td>${formatDateTime(s.updated_at)}</td></tr>
+        </table>
+      </div></div>
+    </div>
+    <div class="col-md-8">
+      <div class="card"><div class="card-body">
+        <h6 class="mb-3">Последние 5 событий статуса (за 7 дней)</h6>
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr>
+            <th>Дата/время</th><th>Было</th><th>Стало</th><th>Причина</th>
+          </tr></thead>
+          <tbody>${histHTML}</tbody>
+        </table>
+        <div class="mt-3">
+          <button class="btn btn-outline-secondary btn-sm" onclick="goSensorHistoryFromDetail()">
+            <i class="bi bi-clock-history me-1"></i>Полная история статусов</button>
+        </div>
+      </div></div>
+    </div>`;
+  applyRole();
+}
+
+function editSenDetail() {
+  if (ctxSensorObj) openSensorModal(ctxSensorObj);
+  else if (ctxSensor) {
+    const s = sensorsAll.find(x => x.id === ctxSensor);
+    if (s) openSensorModal(s);
+  }
+}
+
 async function openSensorModal(s) {
   g('msId').value = s?.id || '';
-  const blds = await api('GET','/buildings') || [];
+  const blds = await apiAll('/buildings');
   g('msBldg').innerHTML = blds.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
   if (s) g('msBldg').value = s.building_id;
   await fillFloors4Sen();
@@ -1165,37 +1837,70 @@ async function fillRooms4Sen() {
 }
 async function saveSensor() {
   const id=g('msId').value, rid=g('msRoom').value, fid=g('msFloor').value, bid=g('msBldg').value;
-  const body={room_id:rid,floor_id:fid,building_id:bid,
-    metric_type:g('msMetric').value, model:g('msModel').value, status:g('msSt').value};
-  const r = id ? await api('PUT','/sensors/'+id,body) : await api('POST','/sensors',body);
-  if (!r) return;
-  bootstrap.Modal.getInstance(g('mSensor'))?.hide();
-  toast('Датчик сохранён','success'); loadSensors();
+  const btn = document.querySelector('#mSensor .btn-primary');
+  btn.disabled = true;
+  try {
+    const body={room_id:rid,floor_id:fid,building_id:bid,
+      metric_type:g('msMetric').value, model:g('msModel').value, status:g('msSt').value};
+    const r = id ? await api('PUT','/sensors/'+id,body) : await api('POST','/sensors',body);
+    if (!r) return;
+    bootstrap.Modal.getInstance(g('mSensor'))?.hide();
+    toast('Датчик сохранён','success'); loadSensors();
+  } finally {
+    btn.disabled = false;
+  }
 }
 async function delSensor(id) {
   if (!confirm('Удалить датчик?')) return;
   await api('DELETE','/sensors/'+id); toast('Удалён','success'); loadSensors();
 }
 
-// История показаний сенсора
+// ── История статусов датчика ──
 
 async function loadSensorHistory() {
   const period = g('histPeriod').value;
-  const rows = await api('GET','/sensors/'+ctxSensor+'/history?start='+period) || [];
-  g('histTBody').innerHTML = rows.map(r=>`<tr>
-    <td>${r.time ? formatTime(r.time) : '—'}</td>
+  historyAll = await api('GET','/sensors/'+ctxSensor+'/history?start='+period) || [];
+  filterHistory();
+}
+
+function filterHistory() {
+  const os = g('histOldSt').value;
+  const ns = g('histNewSt').value;
+  const rs = (g('histReason')?.value || '').toLowerCase();
+  const dfVal = g('histDateFrom')?.value;
+  const dtVal = g('histDateTo')?.value;
+  const df = dfVal ? new Date(dfVal).getTime() : null;
+  const dt = dtVal ? new Date(dtVal).getTime() + 59000 : null;
+
+  const filtered = historyAll.filter(r => {
+    if (os && r.old_status !== os) return false;
+    if (ns && r.new_status !== ns) return false;
+    if (rs && !(r.reason||'').toLowerCase().includes(rs)) return false;
+    if (r.time && (df || dt)) {
+      const t = new Date(r.time).getTime();
+      if (!isNaN(t)) {
+        if (df && t < df) return false;
+        if (dt && t > dt) return false;
+      }
+    }
+    return true;
+  });
+
+  g('histTBody').innerHTML = filtered.map(r=>`<tr>
+    <td>${r.time ? formatDateTime(r.time) : '—'}</td>
     <td><span class="bstat bstat-${r.old_status}">${r.old_status}</span></td>
     <td><span class="bstat bstat-${r.new_status}">${r.new_status}</span></td>
     <td>${r.reason||'—'}</td>
   </tr>`).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">Нет событий</td></tr>';
+  if (g('histCount')) g('histCount').innerHTML = renderCount(filtered.length);
 }
 
-// Поиск
+// ── Поиск ──
 
 async function doSearch() {
   const [rooms, blds, reads] = await Promise.all([
-    api('GET','/rooms'),
-    api('GET','/buildings'),
+    apiAll('/rooms'),
+    apiAll('/buildings'),
     api('GET','/readings/latest'),
   ]);
   const bMap = Object.fromEntries((blds||[]).map(b=>[b.id,b.name]));
@@ -1208,13 +1913,11 @@ async function doSearch() {
     _hum:rMap[r.id+'_humidity'],
     _co2:rMap[r.id+'_co2'],
   }));
-
   const srB=g('srB').value.toLowerCase(), srF=g('srF').value,
         srT=g('srT').value.toLowerCase(), srN=g('srN').value.toLowerCase(),
         srS=g('srS').value,
         tN=nul('srTn'),tX=nul('srTx'), hN=nul('srHn'),hX=nul('srHx'),
         cN=nul('srCn'),cX=nul('srCx');
-
   const f = all.filter(r=>
     (!srB||r._bn.toLowerCase().includes(srB)) &&
     (!srF||r._fn===+srF) &&
@@ -1225,7 +1928,6 @@ async function doSearch() {
     (hN==null||r._hum==null||r._hum>=hN) && (hX==null||r._hum==null||r._hum<=hX) &&
     (cN==null||r._co2==null||r._co2>=cN) && (cX==null||r._co2==null||r._co2<=cX)
   );
-
   g('searchTBody').innerHTML = f.map(r=>`<tr>
     <td><a href="#" onclick="goRoomDetail(${qj(r)})">${r.room_number}</a></td>
     <td>${r.type}</td><td>${r._bn}</td><td>${r._fn}</td>
@@ -1244,48 +1946,33 @@ function resetSearch() {
     '<tr><td colspan="9" class="text-center text-muted py-3">Задайте параметры и нажмите «Найти»</td></tr>';
 }
 
-// Статистика
+// ── Статистика ──
 
 async function initStats() {
-  const blds = await api('GET','/buildings') || [];
+  const blds = await apiAll('/buildings');
   const cur  = g('stBldg').value;
   g('stBldg').innerHTML = '<option value="">Все корпуса</option>' +
     blds.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
   if (cur) g('stBldg').value = cur;
   loadStatistics();
+  if (!g('distAxisX').options.length) initDistribution();
 }
 
 async function loadStatistics() {
-  // Убиваем график перед загрузкой данных
-  if (chartStats) {
-    chartStats.destroy();
-    chartStats = null;
-  }
-
+  if (chartStats) { chartStats.destroy(); chartStats = null; }
   const metric  = g('stMetric').value;
   const period  = g('stPeriod').value;
-  const winSize = g('stWin').value; 
+  const winSize = g('stWin').value;
   const bldgId  = g('stBldg').value;
-
   let url = `/readings/range?start=${period}&metric_type=${metric}&win=${winSize}`;
   if (bldgId) url += `&building_id=${bldgId}`;
-
-  // Подготовка интерфейса перед загрузкой данных
   g('stEmpty').style.display   = 'none';
   g('stLoading').style.display = 'block';
   g('stChartWrap').style.display = 'none';
-
   const data = await api('GET', url) || [];
-
   g('stLoading').style.display = 'none';
-
-  if (!data.length) {
-    g('stEmpty').style.display = 'block';
-    return;
-  }
-
+  if (!data.length) { g('stEmpty').style.display = 'block'; return; }
   g('stChartWrap').style.display = 'block';
-
   const byBldg = {};
   data.forEach(p => {
     const v = parseFloat(p.value);
@@ -1295,16 +1982,12 @@ async function loadStatistics() {
       byBldg[key][p.time] = v;
     }
   });
-
   const allLabels = [...new Set(data.map(p => p.time))].sort();
   const labelsFmt = allLabels.map(t => formatTime(t));
-
-  const blds = await api('GET','/buildings') || [];
+  const blds = await apiAll('/buildings');
   const bMap = Object.fromEntries(blds.map(b=>[b.id,b.name]));
-
   const UNITS = {temperature:'°C', humidity:'%', co2:'ppm'};
   const NAMES = {temperature:'Температура', humidity:'Влажность', co2:'CO₂'};
-
   const datasets = Object.keys(byBldg).map((bid, i) => ({
     label: bMap[bid] || bid,
     data:  allLabels.map(t => byBldg[bid][t] ?? null),
@@ -1313,16 +1996,13 @@ async function loadStatistics() {
     fill:  Object.keys(byBldg).length === 1,
     tension: 0.3, pointRadius: 2, spanGaps: true,
   }));
-
-  // Строим график
   const ctx = document.getElementById('statsChart');
   if (ctx) {
     chartStats = new Chart(ctx, {
       type: 'line',
       data: { labels: labelsFmt, datasets },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { position: 'top', labels:{ boxWidth:12, font:{size:11} } },
           title:  { display: true, text: NAMES[metric] + ' (' + UNITS[metric] + ')' },
@@ -1336,7 +2016,115 @@ async function loadStatistics() {
   }
 }
 
-// Импорт/экспорт данных
+// ── Распределение (статистика) ──
+
+const DIST_AXES_SENSORS = [
+  {v:'building_id',l:'Корпус'}, {v:'metric_type',l:'Тип метрики'},
+  {v:'status',l:'Статус'}, {v:'model',l:'Модель'}, {v:'floor_id',l:'Этаж'},
+];
+const DIST_AXES_ROOMS = [
+  {v:'building_id',l:'Корпус'}, {v:'type',l:'Тип помещения'},
+  {v:'status',l:'Статус'}, {v:'floor_id',l:'Этаж'},
+];
+
+function updateDistOptions() {
+  const ent = g('distEntity').value;
+  const axes = ent === 'sensors' ? DIST_AXES_SENSORS : DIST_AXES_ROOMS;
+  const opts = axes.map(a=>`<option value="${a.v}">${a.l}</option>`).join('');
+  g('distAxisX').innerHTML = opts;
+  g('distAxisY').innerHTML = opts;
+  if (ent === 'sensors') {
+    g('distMetricWrap').style.display = '';
+    g('distTypeWrap').style.display = 'none';
+  } else {
+    g('distMetricWrap').style.display = 'none';
+    g('distTypeWrap').style.display = '';
+  }
+  // Pre-select different Y axis
+  if (g('distAxisY').options.length > 1) g('distAxisY').selectedIndex = 1;
+}
+
+async function initDistribution() {
+  const blds = await apiAll('/buildings');
+  g('distBldg').innerHTML = '<option value="">Все</option>' +
+    blds.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  updateDistOptions();
+}
+
+async function buildDistribution() {
+  const ent = g('distEntity').value;
+  const axX = g('distAxisX').value;
+  const axY = g('distAxisY').value;
+  const bldgF = g('distBldg').value;
+  const statusF = g('distStatus').value;
+  const metricF = g('distMetric').value;
+  const typeF = (g('distRoomType')?.value||'').toLowerCase();
+
+  g('distEmpty').style.display='none';
+  g('distLoading').style.display='block';
+  g('distChartWrap').style.display='none';
+
+  const url = ent === 'sensors' ? '/sensors' : '/rooms';
+  let items = await apiAll(url + (bldgF ? '?building_id='+bldgF : ''));
+
+  // Apply filters
+  if (statusF) items = items.filter(i=>i.status===statusF);
+  if (ent==='sensors' && metricF) items = items.filter(i=>i.metric_type===metricF);
+  if (ent==='rooms' && typeF) items = items.filter(i=>(i.type||'').toLowerCase().includes(typeF));
+
+  g('distLoading').style.display='none';
+  if (!items.length) { g('distEmpty').style.display='block'; return; }
+
+  // Build building name map for display
+  const blds = await apiAll('/buildings');
+  const bMap = Object.fromEntries(blds.map(b=>[b.id,b.name]));
+  const labelOf = (item, axis) => {
+    const v = item[axis]||'—';
+    return axis==='building_id' ? (bMap[v]||v) : v;
+  };
+
+  // Cross-tabulation: xVal → yVal → count
+  const matrix = {};
+  const yVals = new Set();
+  items.forEach(item => {
+    const x = labelOf(item, axX);
+    const y = labelOf(item, axY);
+    yVals.add(y);
+    if (!matrix[x]) matrix[x] = {};
+    matrix[x][y] = (matrix[x][y]||0) + 1;
+  });
+  const xLabels = Object.keys(matrix).sort();
+  const yLabels = [...yVals].sort();
+  const datasets = yLabels.map((yv, i) => ({
+    label: yv,
+    data: xLabels.map(xl => matrix[xl][yv]||0),
+    backgroundColor: COLORS[i % COLORS.length] + 'cc',
+    borderColor: COLORS[i % COLORS.length],
+    borderWidth: 1,
+  }));
+
+  if (chartDist) { chartDist.destroy(); chartDist = null; }
+  g('distChartWrap').style.display='block';
+  const axXLabel = [...(ent==='sensors'?DIST_AXES_SENSORS:DIST_AXES_ROOMS)].find(a=>a.v===axX)?.l||axX;
+  const axYLabel = [...(ent==='sensors'?DIST_AXES_SENSORS:DIST_AXES_ROOMS)].find(a=>a.v===axY)?.l||axY;
+  chartDist = new Chart(document.getElementById('distChart'), {
+    type: 'bar',
+    data: { labels: xLabels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position:'top', labels:{boxWidth:12,font:{size:11}} },
+        title: { display:true, text: `Количество по "${axXLabel}" (группировка: "${axYLabel}")` },
+      },
+      scales: {
+        x: { ticks:{font:{size:10}} },
+        y: { title:{display:true,text:'Количество'}, beginAtZero:true, ticks:{stepSize:1} },
+      },
+    },
+  });
+}
+
+// ── Импорт/экспорт ──
 
 async function doExport() {
   try {
