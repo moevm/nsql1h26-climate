@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from app.influx import (
     write_entity, query_entities, soft_delete,
     query_latest_readings, query_sensor_history, write_status_event, write_entities_batch
@@ -20,6 +20,14 @@ class SensorIn(BaseModel):
     metric_type: str
     model: str
     status: str = "Active"
+
+    @field_validator("metric_type")
+    @classmethod
+    def metric_type_valid(cls, v):
+        allowed = {"temperature", "humidity", "co2"}
+        if v not in allowed:
+            raise ValueError(f"Тип метрики должен быть одним из: {', '.join(sorted(allowed))}")
+        return v
 
 
 class StatusUpdate(BaseModel):
@@ -120,6 +128,29 @@ def update_sensor(sid: str, body: SensorIn, _=Depends(require_admin)):
                                   datetime.now(timezone.utc))]
         write_entities_batch(pts)
     return data
+
+
+@router.patch("/{sid}/status")
+def update_sensor_status(sid: str, body: StatusUpdate, _=Depends(require_admin)):
+    rows = query_entities("sensors", "sensor_id", {"sensor_id": sid})
+    if not rows:
+        raise HTTPException(404, "Датчик не найден")
+    old = rows[0]
+    allowed = {"Active", "Inactive", "Warning", "Error"}
+    if body.status not in allowed:
+        raise HTTPException(422, f"Статус должен быть одним из: {', '.join(allowed)}")
+    now = datetime.now(timezone.utc).isoformat()
+    data = {**old, "status": body.status, "updated_at": now}
+    write_entity("sensors", "sensor_id", sid, data,
+                 extra_tags={k: old[k] for k in
+                             ("room_id", "floor_id", "building_id", "metric_type")})
+    if old.get("status") != body.status:
+        pts = [write_status_event(sid, old["room_id"], old["building_id"],
+                                  old.get("status", ""), body.status,
+                                  body.reason or "Ручное изменение статуса",
+                                  datetime.now(timezone.utc))]
+        write_entities_batch(pts)
+    return {**data, "previous_status": old.get("status")}
 
 
 @router.delete("/{sid}")
