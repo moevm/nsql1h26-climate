@@ -1,3 +1,4 @@
+import math
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -27,10 +28,16 @@ class StatusUpdate(BaseModel):
 
 
 @router.get("")
-def list_sensors(room_id: Optional[str] = None, building_id: Optional[str] = None,
-                 floor_id: Optional[str] = None, metric_type: Optional[str] = None,
-                 status: Optional[str] = None, sensor_id: Optional[str] = None,
-                 model: Optional[str] = None, _=Depends(get_current_user)):
+def list_sensors(
+    room_id: Optional[str] = None, building_id: Optional[str] = None,
+    floor_id: Optional[str] = None, metric_type: Optional[str] = None,
+    status: Optional[str] = None, sensor_id: Optional[str] = None,
+    model: Optional[str] = None,
+    created_from: Optional[str] = None, created_to: Optional[str] = None,
+    updated_from: Optional[str] = None, updated_to: Optional[str] = None,
+    page: int = 1, page_size: int = 25,
+    _=Depends(get_current_user)
+):
     tf = {}
     if room_id:     tf["room_id"]     = room_id
     if building_id: tf["building_id"] = building_id
@@ -39,11 +46,19 @@ def list_sensors(room_id: Optional[str] = None, building_id: Optional[str] = Non
     sensors = query_entities("sensors", "sensor_id", tf or None)
 
     if status:
-        sensors = [s for s in sensors if s.get("status","").lower() == status.lower()]
+        sensors = [s for s in sensors if s.get("status", "").lower() == status.lower()]
     if sensor_id:
-        sensors = [s for s in sensors if sensor_id.lower() in s.get("id","").lower()]
+        sensors = [s for s in sensors if sensor_id.lower() in s.get("id", "").lower()]
     if model:
-        sensors = [s for s in sensors if model.lower() in s.get("model","").lower()]
+        sensors = [s for s in sensors if model.lower() in s.get("model", "").lower()]
+    if created_from:
+        sensors = [s for s in sensors if s.get("created_at", "") >= created_from]
+    if created_to:
+        sensors = [s for s in sensors if s.get("created_at", "") <= created_to + "T23:59:59Z"]
+    if updated_from:
+        sensors = [s for s in sensors if s.get("updated_at", "") >= updated_from]
+    if updated_to:
+        sensors = [s for s in sensors if s.get("updated_at", "") <= updated_to + "T23:59:59Z"]
 
     readings = query_latest_readings(tf or None)
     latest = {(r["sensor_id"], r["metric_type"]): r["value"] for r in readings}
@@ -51,7 +66,12 @@ def list_sensors(room_id: Optional[str] = None, building_id: Optional[str] = Non
         s["last_value"] = latest.get((s["id"], s["metric_type"]))
 
     sensors.sort(key=lambda x: x.get("id", ""))
-    return sensors
+    total = len(sensors)
+    if page_size > 0:
+        start = (page - 1) * page_size
+        sensors = sensors[start:start + page_size]
+    pages = math.ceil(total / page_size) if page_size > 0 and total > 0 else 1
+    return {"items": sensors, "total": total, "page": page, "pages": pages}
 
 
 @router.get("/{sid}")
@@ -73,7 +93,7 @@ def create_sensor(body: SensorIn, _=Depends(require_admin)):
             "created_at": now, "updated_at": now}
     write_entity("sensors", "sensor_id", sid, data,
                  extra_tags={k: getattr(body, k) for k in
-                             ("room_id","floor_id","building_id","metric_type")})
+                             ("room_id", "floor_id", "building_id", "metric_type")})
     pts = [write_status_event(sid, body.room_id, body.building_id,
                               "Inactive", body.status, "Датчик добавлен",
                               datetime.now(timezone.utc))]
@@ -93,7 +113,7 @@ def update_sensor(sid: str, body: SensorIn, _=Depends(require_admin)):
         data["created_at"] = now
     write_entity("sensors", "sensor_id", sid, data,
                  extra_tags={k: getattr(body, k) for k in
-                             ("room_id","floor_id","building_id","metric_type")})
+                             ("room_id", "floor_id", "building_id", "metric_type")})
     if old.get("status") != body.status:
         pts = [write_status_event(sid, body.room_id, body.building_id,
                                   old["status"], body.status, "Ручное изменение",
