@@ -1,0 +1,4 @@
+influxdb-client==1.40.0
+psycopg2-binary==2.9.9
+matplotlib==3.8.4
+numpy==1.26.4

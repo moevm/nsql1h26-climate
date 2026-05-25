@@ -5,11 +5,12 @@ import random
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.routers import auth, buildings, floors, rooms, sensors, readings, io
+from app.auth import get_current_user
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -101,5 +102,16 @@ app.include_router(rooms.router,     prefix="/api/rooms",     tags=["rooms"])
 app.include_router(sensors.router,   prefix="/api/sensors",   tags=["sensors"])
 app.include_router(readings.router,  prefix="/api/readings",  tags=["readings"])
 app.include_router(io.router,        prefix="/api",           tags=["io"])
+
+
+@app.get("/api/seed/status", tags=["system"])
+async def seed_status(_=Depends(get_current_user)):
+    try:
+        from app.influx import query_entities
+        buildings = query_entities("buildings", "building_id")
+        return {"ready": len(buildings) > 0, "count": len(buildings)}
+    except Exception:
+        return {"ready": False, "count": 0}
+
 
 app.mount("/", StaticFiles(directory="/app/static", html=True), name="static")
