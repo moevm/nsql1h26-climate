@@ -16,6 +16,20 @@ class BuildingIn(BaseModel):
     floors_count: int
     status: str = "Active"
 
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Название корпуса не может быть пустым")
+        return v.strip()
+
+    @field_validator("address")
+    @classmethod
+    def address_not_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Адрес не может быть пустым")
+        return v.strip()
+
     @field_validator("floors_count")
     @classmethod
     def floors_positive(cls, v):
