@@ -16,13 +16,13 @@ jobs:
           fetch-depth: 0
 
       - name: Build docker-compose
-        run: .github/workflows/scripts/7_app_is_ready.sh build
+        run: .github/workflows/scripts/7_app_is_ready.sh build ./leti_climate_prototipe/docker-compose.yml
 
       - name: Run docker-compose
-        run: .github/workflows/scripts/7_app_is_ready.sh run
+        run: .github/workflows/scripts/7_app_is_ready.sh run ./leti_climate_prototipe/docker-compose.yml
 
       - name: Check web client root page
-        run: .github/workflows/scripts/7_app_is_ready.sh check-web
+        run: .github/workflows/scripts/7_app_is_ready.sh check-web ./leti_climate_prototipe/docker-compose.yml
 
       - name: check
         run: .github/workflows/scripts/7_app_is_ready.sh check-tag
