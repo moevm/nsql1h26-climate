@@ -255,10 +255,10 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
           <div class="col-md-2"><select class="form-select" id="fFS" onchange="filterFloors()">
             <option value="">Любой статус</option><option>Active</option><option>Inactive</option>
           </select></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fFCf" onchange="filterFloors()" title="Создан от"/></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fFCt" onchange="filterFloors()" title="Создан до"/></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fFUf" onchange="filterFloors()" title="Изменён от"/></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fFUt" onchange="filterFloors()" title="Изменён до"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Создан от</label><input class="form-control" type="datetime-local" id="fFCf" onchange="filterFloors()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Создан до</label><input class="form-control" type="datetime-local" id="fFCt" onchange="filterFloors()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Изменён от</label><input class="form-control" type="datetime-local" id="fFUf" onchange="filterFloors()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Изменён до</label><input class="form-control" type="datetime-local" id="fFUt" onchange="filterFloors()"/></div>
           <div class="col-md-2"><input class="form-control" type="number" id="fFTn" placeholder="°C от" oninput="filterFloors()"/></div>
           <div class="col-md-2"><input class="form-control" type="number" id="fFTx" placeholder="°C до" oninput="filterFloors()"/></div>
           <div class="col-md-2"><input class="form-control" type="number" id="fFHn" placeholder="% от" oninput="filterFloors()"/></div>
