@@ -26,6 +26,8 @@ def list_rooms(
     room_number: Optional[str] = None, type: Optional[str] = None,
     status: Optional[str] = None,
     area_min: Optional[float] = None, area_max: Optional[float] = None,
+    created_from: Optional[str] = None, created_to: Optional[str] = None,
+    updated_from: Optional[str] = None, updated_to: Optional[str] = None,
     temp_min: Optional[float] = None, temp_max: Optional[float] = None,
     hum_min: Optional[float] = None, hum_max: Optional[float] = None,
     co2_min: Optional[float] = None, co2_max: Optional[float] = None,
@@ -46,6 +48,16 @@ def list_rooms(
         items = [i for i in items if i.get("area", 0) >= area_min]
     if area_max is not None:
         items = [i for i in items if i.get("area", 0) <= area_max]
+    if created_from:
+        items = [i for i in items if i.get("created_at", "") >= created_from]
+    if created_to:
+        to_val = (created_to + ":59") if "T" in created_to else (created_to + "T23:59:59")
+        items = [i for i in items if i.get("created_at", "") <= to_val]
+    if updated_from:
+        items = [i for i in items if i.get("updated_at", "") >= updated_from]
+    if updated_to:
+        to_val = (updated_to + ":59") if "T" in updated_to else (updated_to + "T23:59:59")
+        items = [i for i in items if i.get("updated_at", "") <= to_val]
 
     needs_metrics = any(x is not None for x in [temp_min, temp_max, hum_min, hum_max, co2_min, co2_max])
     if needs_metrics:

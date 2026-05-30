@@ -131,7 +131,7 @@ def _get_building_ids_from_metadata():
     return [b["id"] for b in buildings]
 
 
-def query_readings_range(start, metric_type=None, building_id=None,
+def query_readings_range(start, stop=None, metric_type=None, building_id=None,
                          floor_id=None, room_id=None, win="1h"):
     """
     Окно усреднения сгруппировано по (building_id, metric_type).
@@ -145,6 +145,8 @@ def query_readings_range(start, metric_type=None, building_id=None,
         extra += f'\n  |> filter(fn: (r) => r.floor_id == "{floor_id}")'
     if room_id:
         extra += f'\n  |> filter(fn: (r) => r.room_id == "{room_id}")'
+
+    range_clause = f"range(start: {start}, stop: {stop})" if stop else f"range(start: {start})"
 
     if building_id:
         bids = [building_id]
@@ -161,7 +163,7 @@ def query_readings_range(start, metric_type=None, building_id=None,
         for bid in bids:
             q = f"""
 from(bucket: "{INFLUX_BUCKET}")
-  |> range(start: {start})
+  |> {range_clause}
   |> filter(fn: (r) => r._measurement == "climate_readings")
   |> filter(fn: (r) => r._field == "value")
   |> filter(fn: (r) => r.building_id == "{bid}")

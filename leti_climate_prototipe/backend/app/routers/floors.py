@@ -15,6 +15,13 @@ class FloorIn(BaseModel):
     floor_number: int
     status: str = "Active"
 
+    @field_validator("building_id")
+    @classmethod
+    def building_id_not_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError("ID корпуса не может быть пустым")
+        return v.strip()
+
     @field_validator("floor_number")
     @classmethod
     def floor_positive(cls, v):
@@ -46,11 +53,13 @@ def list_floors(
     if created_from:
         items = [i for i in items if i.get("created_at", "") >= created_from]
     if created_to:
-        items = [i for i in items if i.get("created_at", "") <= created_to + "T23:59:59Z"]
+        to_val = (created_to + ":59") if "T" in created_to else (created_to + "T23:59:59")
+        items = [i for i in items if i.get("created_at", "") <= to_val]
     if updated_from:
         items = [i for i in items if i.get("updated_at", "") >= updated_from]
     if updated_to:
-        items = [i for i in items if i.get("updated_at", "") <= updated_to + "T23:59:59Z"]
+        to_val = (updated_to + ":59") if "T" in updated_to else (updated_to + "T23:59:59")
+        items = [i for i in items if i.get("updated_at", "") <= to_val]
 
     needs_metrics = any(x is not None for x in [temp_min, temp_max, hum_min, hum_max, co2_min, co2_max])
     if needs_metrics:

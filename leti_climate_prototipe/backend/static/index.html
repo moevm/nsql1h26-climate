@@ -158,10 +158,10 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
           </select></div>
           <div class="col-md-1"><input class="form-control" id="fBF1" placeholder="Эт≥" type="number" min="1" oninput="filterBldg()"/></div>
           <div class="col-md-1"><input class="form-control" id="fBF2" placeholder="Эт≤" type="number" min="1" oninput="filterBldg()"/></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fBCf" onchange="filterBldg()" title="Создан от"/></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fBCt" onchange="filterBldg()" title="Создан до"/></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fBUf" onchange="filterBldg()" title="Изменён от"/></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fBUt" onchange="filterBldg()" title="Изменён до"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Создан от</label><input class="form-control" type="datetime-local" id="fBCf" onchange="filterBldg()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Создан до</label><input class="form-control" type="datetime-local" id="fBCt" onchange="filterBldg()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Изменён от</label><input class="form-control" type="datetime-local" id="fBUf" onchange="filterBldg()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Изменён до</label><input class="form-control" type="datetime-local" id="fBUt" onchange="filterBldg()"/></div>
           <div class="col-auto"><button class="btn btn-outline-secondary btn-sm"
             onclick="resetF('fBN','fBA','fBS','fBF1','fBF2','fBCf','fBCt','fBUf','fBUt');filterBldg()"><i class="bi bi-x-lg"></i></button></div>
         </div>
@@ -337,8 +337,12 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
           </select></div>
           <div class="col-md-1"><input class="form-control" id="fRA1" placeholder="Пл≥" type="number" oninput="filterRooms()"/></div>
           <div class="col-md-1"><input class="form-control" id="fRA2" placeholder="Пл≤" type="number" oninput="filterRooms()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Создан от</label><input class="form-control" type="datetime-local" id="fRCf" onchange="filterRooms()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Создан до</label><input class="form-control" type="datetime-local" id="fRCt" onchange="filterRooms()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Изменён от</label><input class="form-control" type="datetime-local" id="fRUf" onchange="filterRooms()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Изменён до</label><input class="form-control" type="datetime-local" id="fRUt" onchange="filterRooms()"/></div>
           <div class="col-auto"><button class="btn btn-outline-secondary btn-sm"
-            onclick="resetF('fRN','fRT','fRB','fRS','fRA1','fRA2');filterRooms()"><i class="bi bi-x-lg"></i></button></div>
+            onclick="resetF('fRN','fRT','fRB','fRS','fRA1','fRA2','fRCf','fRCt','fRUf','fRUt');filterRooms()"><i class="bi bi-x-lg"></i></button></div>
         </div>
       </div></div>
       <div class="card"><div class="card-body p-0">
@@ -396,10 +400,10 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
             <option value="">Статус</option><option>Active</option><option>Warning</option>
             <option>Error</option><option>Inactive</option>
           </select></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fSCf" onchange="filterSensors()" title="Создан от"/></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fSCt" onchange="filterSensors()" title="Создан до"/></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fSUf" onchange="filterSensors()" title="Изменён от"/></div>
-          <div class="col-md-2"><input class="form-control" type="date" id="fSUt" onchange="filterSensors()" title="Изменён до"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Создан от</label><input class="form-control" type="datetime-local" id="fSCf" onchange="filterSensors()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Создан до</label><input class="form-control" type="datetime-local" id="fSCt" onchange="filterSensors()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Изменён от</label><input class="form-control" type="datetime-local" id="fSUf" onchange="filterSensors()"/></div>
+          <div class="col-md-3"><label class="form-label mb-1 small text-muted">Изменён до</label><input class="form-control" type="datetime-local" id="fSUt" onchange="filterSensors()"/></div>
           <div class="col-auto"><button class="btn btn-outline-secondary btn-sm"
             onclick="resetF('fSI','fST','fSM','fSB','fSR','fSS','fSCf','fSCt','fSUf','fSUt');filterSensors()"><i class="bi bi-x-lg"></i></button></div>
         </div>
@@ -562,13 +566,10 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
               <option value="humidity">Влажность</option>
               <option value="co2">CO₂</option>
             </select></div>
-          <div class="col-md-2"><label class="form-label">Период</label>
-            <select class="form-select" id="stPeriod">
-              <option value="-6h">6 часов</option>
-              <option value="-24h" selected>24 часа</option>
-              <option value="-7d">7 дней</option>
-              <option value="-30d">30 дней</option>
-            </select></div>
+          <div class="col-md-2"><label class="form-label">От</label>
+            <input class="form-control" type="datetime-local" id="stFrom"/></div>
+          <div class="col-md-2"><label class="form-label">До</label>
+            <input class="form-control" type="datetime-local" id="stTo"/></div>
           <div class="col-md-2"><label class="form-label">Интервал</label>
             <select class="form-select" id="stWin">
               <option value="15m">15 мин</option>
@@ -576,7 +577,7 @@ th.sortable{cursor:pointer}th.sortable:hover{background:#f8f9fa}
               <option value="6h">6 часов</option>
               <option value="1d">1 день</option>
             </select></div>
-          <div class="col-md-3"><label class="form-label">Корпус</label>
+          <div class="col-md-2"><label class="form-label">Корпус</label>
             <select class="form-select" id="stBldg">
               <option value="">Все корпуса</option>
             </select></div>
@@ -1524,6 +1525,10 @@ async function fetchRooms() {
   const fs = g('fRS')?.value; if (fs) p.set('status', fs);
   const a1 = g('fRA1')?.value; if (a1) p.set('area_min', a1);
   const a2 = g('fRA2')?.value; if (a2) p.set('area_max', a2);
+  const cf = g('fRCf')?.value; if (cf) p.set('created_from', cf);
+  const ct = g('fRCt')?.value; if (ct) p.set('created_to', ct);
+  const uf = g('fRUf')?.value; if (uf) p.set('updated_from', uf);
+  const ut = g('fRUt')?.value; if (ut) p.set('updated_to', ut);
   const r = await api('GET', '/rooms?' + p.toString());
   const bMap = Object.fromEntries((_roomsBlds||[]).map(b=>[b.id,b.name]));
   const rMap = {};
@@ -1961,10 +1966,14 @@ async function initStats() {
 async function loadStatistics() {
   if (chartStats) { chartStats.destroy(); chartStats = null; }
   const metric  = g('stMetric').value;
-  const period  = g('stPeriod').value;
+  const fromVal = g('stFrom').value;
+  const toVal   = g('stTo').value;
   const winSize = g('stWin').value;
   const bldgId  = g('stBldg').value;
-  let url = `/readings/range?start=${period}&metric_type=${metric}&win=${winSize}`;
+  const start   = fromVal ? encodeURIComponent(fromVal + ':00Z') : '-24h';
+  const stop    = toVal   ? encodeURIComponent(toVal   + ':00Z') : '';
+  let url = `/readings/range?start=${start}&metric_type=${metric}&win=${winSize}`;
+  if (stop)   url += `&stop=${stop}`;
   if (bldgId) url += `&building_id=${bldgId}`;
   g('stEmpty').style.display   = 'none';
   g('stLoading').style.display = 'block';

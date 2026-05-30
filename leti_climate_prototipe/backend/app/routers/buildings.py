@@ -62,11 +62,13 @@ def list_buildings(
     if created_from:
         items = [i for i in items if i.get("created_at", "") >= created_from]
     if created_to:
-        items = [i for i in items if i.get("created_at", "") <= created_to + "T23:59:59Z"]
+        to_val = (created_to + ":59") if "T" in created_to else (created_to + "T23:59:59")
+        items = [i for i in items if i.get("created_at", "") <= to_val]
     if updated_from:
         items = [i for i in items if i.get("updated_at", "") >= updated_from]
     if updated_to:
-        items = [i for i in items if i.get("updated_at", "") <= updated_to + "T23:59:59Z"]
+        to_val = (updated_to + ":59") if "T" in updated_to else (updated_to + "T23:59:59")
+        items = [i for i in items if i.get("updated_at", "") <= to_val]
     items.sort(key=lambda x: x.get("name", ""))
     total = len(items)
     if page_size > 0:

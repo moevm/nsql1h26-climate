@@ -62,11 +62,13 @@ def list_sensors(
     if created_from:
         sensors = [s for s in sensors if s.get("created_at", "") >= created_from]
     if created_to:
-        sensors = [s for s in sensors if s.get("created_at", "") <= created_to + "T23:59:59Z"]
+        to_val = (created_to + ":59") if "T" in created_to else (created_to + "T23:59:59")
+        sensors = [s for s in sensors if s.get("created_at", "") <= to_val]
     if updated_from:
         sensors = [s for s in sensors if s.get("updated_at", "") >= updated_from]
     if updated_to:
-        sensors = [s for s in sensors if s.get("updated_at", "") <= updated_to + "T23:59:59Z"]
+        to_val = (updated_to + ":59") if "T" in updated_to else (updated_to + "T23:59:59")
+        sensors = [s for s in sensors if s.get("updated_at", "") <= to_val]
 
     readings = query_latest_readings(tf or None)
     latest = {(r["sensor_id"], r["metric_type"]): r["value"] for r in readings}

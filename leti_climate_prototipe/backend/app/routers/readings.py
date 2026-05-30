@@ -20,13 +20,14 @@ def latest_readings(sensor_id: Optional[str] = None, room_id: Optional[str] = No
 
 @router.get("/range")
 def range_readings(start: str = "-24h",
+                   stop: Optional[str] = None,
                    metric_type: Optional[str] = None,
                    building_id: Optional[str] = None,
                    floor_id:    Optional[str] = None,
                    room_id:     Optional[str] = None,
                    win:         str = "1h",
                    _=Depends(get_current_user)):
-    return query_readings_range(start, metric_type, building_id, floor_id, room_id, win)
+    return query_readings_range(start, stop, metric_type, building_id, floor_id, room_id, win)
 
 
 @router.get("/dashboard")
